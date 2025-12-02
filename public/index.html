@@ -1,33 +1,32 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Item Checklist</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Item Checklist</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" sizes="128x128" href="/favicon.png">
 </head>
 <body>
-    <div class="container">
-        <h1>📦 Item Checklist</h1>
-        
-        <div id="login-section" class="hidden">
-            <p>Please enter the access code to continue.</p>
-            <input type="password" id="password-input" placeholder="Enter password" />
-            <button id="login-btn">Login</button>
-            <p id="login-error" class="error"></p>
-        </div>
-
-        <div id="app-section" class="hidden">
-            <div class="toolbar">
-                <input type="text" id="search-input" placeholder="Search items..." />
-            </div>
-            
-            <div id="items-list">
-                <!-- Items will be injected here -->
-            </div>
-        </div>
+  <div id="app">
+    <div class="row">
+      <h1 style="margin:0">Checklist</h1>
+      <div class="toggle">
+        <label class="switch" for="claimToggle">
+          <input id="claimToggle" type="checkbox">
+          <span class="slider"></span>
+        </label>
+        <label id="claimLabel" for="claimToggle">Claim Mode</label>
+      </div>
     </div>
-
-    <script src="app.js"></script>
+    <div id="login">
+      <input id="pwd" type="password" placeholder="Password">
+      <input id="claimer" type="text" placeholder="Your name">
+      <button id="loginBtn">Login</button>
+      <span id="loginMsg"></span>
+    </div>
+    <div id="items"></div>
+  </div>
+  <script src="app.js" defer></script>
 </body>
 </html>
