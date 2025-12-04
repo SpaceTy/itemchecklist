@@ -11,12 +11,28 @@
   <div id="app">
     <div class="row">
       <h1 style="margin:0">Checklist</h1>
-      <div class="toggle">
-        <label class="switch" for="claimToggle">
-          <input id="claimToggle" type="checkbox">
-          <span class="slider"></span>
-        </label>
-        <label id="claimLabel" for="claimToggle">Claim Mode</label>
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <div class="toggle">
+          <label class="switch" for="claimToggle">
+            <input id="claimToggle" type="checkbox">
+            <span class="slider"></span>
+          </label>
+          <label id="claimLabel" for="claimToggle">Claim Mode</label>
+        </div>
+        <div class="sort-controls">
+          <select id="sortMode">
+            <option value="none">No Sort</option>
+            <option value="alphabetical">A-Z</option>
+            <option value="progress">Progress</option>
+            <option value="target">Target</option>
+          </select>
+          <button id="sortBtn">Sort</button>
+          <select id="finishedPriority">
+            <option value="neutral">Finished: Neutral</option>
+            <option value="first">Finished: First</option>
+            <option value="last">Finished: Last</option>
+          </select>
+        </div>
       </div>
     </div>
     <div id="login">
