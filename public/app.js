@@ -13,7 +13,7 @@ let pendingRender = null;
 let currentItems = [];
 
 async function authCheck() {
-  const ok = await fetch("/api/check-auth").then(r => r.ok);
+  const ok = await fetch("api/check-auth").then(r => r.ok);
   loginRow.style.display = ok ? "none" : "flex";
   if (ok) {
     loadItems();
@@ -24,7 +24,7 @@ async function authCheck() {
 document.getElementById("loginBtn").onclick = async () => {
   msg.textContent = "";
   const pwd = document.getElementById("pwd").value.trim();
-  const res = await fetch("/api/login", {
+  const res = await fetch("api/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password: pwd })
@@ -45,7 +45,7 @@ function toggleClaimMode(enabled) {
 }
 
 async function loadItems() {
-  const res = await fetch("/api/items");
+  const res = await fetch("api/items");
   if (!res.ok) {
     itemsEl.textContent = "Auth required";
     return;
@@ -299,7 +299,7 @@ async function update(item, id, val) {
     const claimer = document.getElementById("claimer").value.trim() || "anon";
     const remaining = Math.max(item.target - item.gathered, 0);
     const claimed = Math.min(Math.max(val - item.gathered, 0), remaining);
-    await fetch("/api/items/claim", {
+    await fetch("api/items/claim", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: item.name, claimed, claimer })
@@ -310,7 +310,7 @@ async function update(item, id, val) {
   lastUpdate[item.name] = val;
   const count = document.getElementById(id);
   if (count) count.textContent = val;
-  await fetch("/api/items/update", {
+  await fetch("api/items/update", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name: item.name, gathered: val })
@@ -364,7 +364,7 @@ function enableDrag(slider, max, onEndDrag = () => {}) {
 }
 
 function clearClaim(itemName, claimer) {
-  fetch("/api/items/claim", {
+  fetch("api/items/claim", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name: itemName, claimed: 0, claimer })
@@ -372,7 +372,7 @@ function clearClaim(itemName, claimer) {
 }
 
 function startStream() {
-  const es = new EventSource("/events");
+  const es = new EventSource("events");
   es.onmessage = e => {
     try {
       const data = JSON.parse(e.data);

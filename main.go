@@ -155,7 +155,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
 		Value:    req.Password,
-		Path:     "/",
+		Path:     "/itemchecklist/",
 		MaxAge:   30 * 24 * 60 * 60,
 		HttpOnly: false,
 	})
