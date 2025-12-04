@@ -1,0 +1,72 @@
+apply.tysmp.com {
+  handle /api/* {
+    reverse_proxy localhost:5099
+  }
+  handle {
+    root * TYFORMS/wwwroot
+    file_server
+    try_files {path} /index.html
+  }
+  tls {
+    protocols tls1.2 tls1.3
+  }
+}
+
+vote.tysmp.com {
+  handle {
+    root * vote
+    file_server
+    try_files {path} /index.html
+  }
+  tls {
+    protocols tls1.2 tls1.3
+  }
+}
+
+rules.tysmp.com {
+    tls {
+        protocols tls1.2 tls1.3
+    }
+
+    # Item Checklist App
+    redir /itemchecklist /itemchecklist/
+    handle_path /itemchecklist/* {
+        reverse_proxy localhost:3001
+    }
+
+    handle {
+        root * rules
+        file_server
+        try_files {path} /index.html
+    }
+}
+
+wordle.tysmp.com {
+  handle /api/* {
+    reverse_proxy localhost:3001
+  }
+  handle {
+    root * wordle/public
+    file_server
+    try_files {path} /index.html
+  }
+  tls {
+    protocols tls1.2 tls1.3
+  }
+}
+
+n8n.spacety.dev {
+  reverse_proxy localhost:5678
+}
+
+wiki.tysmp.com {
+    reverse_proxy localhost:8081 {
+        header_up Host {http.request.host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+    tls {
+        protocols tls1.2 tls1.3
+    }
+}
