@@ -93,7 +93,6 @@ body {
     --track-bg: #0f172a;
     --track-border: #1e293b;
     --thumb: #64748b;
-    pointer-events: none;
 }
 
 .card.completed input[type="range"]::-webkit-slider-runnable-track {
