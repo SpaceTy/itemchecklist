@@ -494,3 +494,109 @@ input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0 30px #1e293b inset !important;
   -webkit-text-fill-color: #e2e8f0 !important;
 }
+
+/* Search container */
+.search-container {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  margin: -24px auto 0;
+}
+
+.search-container input[type=text] {
+  width: 100%;
+  padding: 12px 16px;
+  padding-right: 40px;
+  font-size: 15px;
+  border-radius: 10px;
+  border: 2px solid #334155;
+  background: #1e293b;
+  transition: all 0.2s ease;
+}
+
+.search-container input[type=text]:focus {
+  border-color: #38bdf8;
+  background: #0f172a;
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.1);
+}
+
+.search-container input[type=text]::placeholder {
+  color: #64748b;
+  font-style: italic;
+}
+
+.search-container button {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #475569;
+  color: #e2e8f0;
+  border-radius: 6px;
+  font-size: 16px;
+  line-height: 1;
+  transition: all 0.15s ease;
+  box-shadow: none;
+}
+
+.search-container button:hover {
+  background: #64748b;
+  transform: translateY(-50%) scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.search-container button:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+/* Fuzzy match highlighting */
+mark.fuzzy-match {
+  background: #0ea5e9;
+  color: #0b1120;
+  padding: 2px 1px;
+  border-radius: 3px;
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(14, 165, 233, 0.4);
+  animation: highlight-pulse 0.3s ease;
+}
+
+@keyframes highlight-pulse {
+  0% {
+    background: #38bdf8;
+    transform: scale(1.05);
+  }
+  100% {
+    background: #0ea5e9;
+    transform: scale(1);
+  }
+}
+
+/* Card styling when no results */
+#items:empty::after {
+  content: "No items found";
+  display: block;
+  text-align: center;
+  padding: 40px 20px;
+  color: #64748b;
+  font-size: 16px;
+  font-style: italic;
+}
+
+/* Responsive search */
+@media (max-width: 640px) {
+  .search-container {
+    margin: -16px auto 0;
+  }
+
+  .search-container input[type=text] {
+    padding: 10px 14px;
+    padding-right: 36px;
+    font-size: 14px;
+  }
+}

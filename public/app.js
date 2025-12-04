@@ -6,11 +6,15 @@ const claimLabel = document.getElementById("claimLabel");
 const sortBtn = document.getElementById("sortBtn");
 const sortModeEl = document.getElementById("sortMode");
 const finishedPriorityEl = document.getElementById("finishedPriority");
+const searchInput = document.getElementById("searchInput");
+const clearSearchBtn = document.getElementById("clearSearch");
 let claimMode = false;
 let lastUpdate = {};
 let dragActive = false;
 let pendingRender = null;
 let currentItems = [];
+let searchQuery = "";
+let allItems = [];
 
 async function authCheck() {
   const ok = await fetch("api/check-auth").then(r => r.ok);
@@ -35,6 +39,97 @@ document.getElementById("loginBtn").onclick = async () => {
 
 claimBtn.onchange = () => toggleClaimMode(claimBtn.checked);
 sortBtn.onclick = () => performSort();
+
+// Fuzzy search implementation (fzf-like)
+function fuzzyMatch(pattern, str) {
+  if (!pattern) return { matched: true, score: 0, indices: [] };
+
+  pattern = pattern.toLowerCase();
+  str = str.toLowerCase();
+
+  let patternIdx = 0;
+  let strIdx = 0;
+  const indices = [];
+  let score = 0;
+  let consecutiveMatches = 0;
+
+  while (patternIdx < pattern.length && strIdx < str.length) {
+    if (pattern[patternIdx] === str[strIdx]) {
+      indices.push(strIdx);
+
+      // Bonus for consecutive matches
+      if (indices.length > 1 && indices[indices.length - 1] === indices[indices.length - 2] + 1) {
+        consecutiveMatches++;
+        score += 5 + consecutiveMatches; // Increasing bonus for longer sequences
+      } else {
+        consecutiveMatches = 0;
+        score += 1;
+      }
+
+      // Bonus for matching at word start
+      if (strIdx === 0 || str[strIdx - 1] === ' ' || str[strIdx - 1] === '-' || str[strIdx - 1] === '_') {
+        score += 8;
+      }
+
+      patternIdx++;
+    }
+    strIdx++;
+  }
+
+  const matched = patternIdx === pattern.length;
+  if (matched) {
+    // Penalty for gaps
+    const gaps = indices.length > 0 ? indices[indices.length - 1] - indices[0] - indices.length + 1 : 0;
+    score -= gaps * 0.5;
+
+    // Bonus for shorter strings (preferring exact/closer matches)
+    score += (1 / (str.length + 1)) * 10;
+  }
+
+  return { matched, score: matched ? score : -Infinity, indices };
+}
+
+function filterAndSortBySearch(items, query) {
+  if (!query.trim()) return items;
+
+  const results = items.map(item => ({
+    item,
+    match: fuzzyMatch(query, item.name)
+  }))
+  .filter(({ match }) => match.matched)
+  .sort((a, b) => b.match.score - a.match.score);
+
+  return results.map(({ item, match }) => ({ ...item, _matchIndices: match.indices }));
+}
+
+searchInput.oninput = (e) => {
+  searchQuery = e.target.value;
+  clearSearchBtn.style.display = searchQuery ? "block" : "none";
+  applySearchFilter();
+};
+
+searchInput.onkeydown = (e) => {
+  if (e.key === "Escape") {
+    searchInput.value = "";
+    searchQuery = "";
+    clearSearchBtn.style.display = "none";
+    applySearchFilter();
+  }
+};
+
+clearSearchBtn.onclick = () => {
+  searchInput.value = "";
+  searchQuery = "";
+  clearSearchBtn.style.display = "none";
+  applySearchFilter();
+  searchInput.focus();
+};
+
+function applySearchFilter() {
+  const filtered = filterAndSortBySearch(allItems, searchQuery);
+  const ordered = searchQuery ? filtered : applySortOrder(filtered);
+  renderDirect(ordered);
+}
 
 function toggleClaimMode(enabled) {
   claimMode = enabled;
@@ -232,6 +327,20 @@ function setSliderVars(slider, max) {
   slider.style.setProperty("--value", slider.value || 0);
 }
 
+function highlightMatches(text, indices) {
+  if (!indices || indices.length === 0) {
+    return text;
+  }
+
+  const indicesSet = new Set(indices);
+  return text.split('').map((char, i) => {
+    if (indicesSet.has(i)) {
+      return `<mark class="fuzzy-match">${char}</mark>`;
+    }
+    return char;
+  }).join('');
+}
+
 function renderDirect(list) {
   // Render without applying stored order (used when we already have sorted list)
   if (dragActive) {
@@ -248,7 +357,8 @@ function renderDirect(list) {
     card.className = isCompleted ? "card completed" : "card";
     const id = "g-" + safeId(item.name);
     const max = item.target;
-    card.innerHTML = `<div class="row"><div class="name">${item.name}</div><div class="count"><span id="${id}">${item.gathered}</span> / ${item.target}</div></div><div style="position:relative;padding-top:12px"><div class="claims"></div><input type="range" min="0" max="${max}" value="${item.gathered}" step="1"></div>`;
+    const displayName = item._matchIndices ? highlightMatches(item.name, item._matchIndices) : item.name;
+    card.innerHTML = `<div class="row"><div class="name">${displayName}</div><div class="count"><span id="${id}">${item.gathered}</span> / ${item.target}</div></div><div style="position:relative;padding-top:12px"><div class="claims"></div><input type="range" min="0" max="${max}" value="${item.gathered}" step="1"></div>`;
     paintClaims(card.querySelector(".claims"), item);
     const slider = card.querySelector("input");
     setSliderVars(slider, max);
@@ -271,9 +381,15 @@ function renderDirect(list) {
 }
 
 function render(list) {
-  // Apply stored sort order if it exists, then render
-  const orderedList = applySortOrder(list);
-  renderDirect(orderedList);
+  // Store all items for searching
+  allItems = list;
+  // If there's a search query, apply it; otherwise use stored sort order
+  if (searchQuery) {
+    applySearchFilter();
+  } else {
+    const orderedList = applySortOrder(list);
+    renderDirect(orderedList);
+  }
 }
 
 function paintClaims(el, item) {

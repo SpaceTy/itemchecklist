@@ -112,6 +112,8 @@ func main() {
 	go scheduleBackups()
 
 	mux := http.NewServeMux()
+
+	// Register API handlers with and without /itemchecklist/ prefix
 	mux.HandleFunc("/api/login", loginHandler)
 	mux.HandleFunc("/api/check-auth", requireAuth(checkAuthHandler))
 	mux.HandleFunc("/api/items", requireAuth(getItemsHandler))
@@ -120,13 +122,72 @@ func main() {
 	mux.HandleFunc("/api/config/passwords", requireAuth(passwordsHandler))
 	mux.HandleFunc("/events", requireAuth(sseHandler(broker)))
 
-	fileServer := http.FileServer(http.Dir("public"))
-	mux.Handle("/", fileServer)
+	mux.HandleFunc("/itemchecklist/api/login", loginHandler)
+	mux.HandleFunc("/itemchecklist/api/check-auth", requireAuth(checkAuthHandler))
+	mux.HandleFunc("/itemchecklist/api/items", requireAuth(getItemsHandler))
+	mux.HandleFunc("/itemchecklist/api/items/update", requireAuth(updateItemHandler(broker)))
+	mux.HandleFunc("/itemchecklist/api/items/claim", requireAuth(claimItemHandler(broker)))
+	mux.HandleFunc("/itemchecklist/api/config/passwords", requireAuth(passwordsHandler))
+	mux.HandleFunc("/itemchecklist/events", requireAuth(sseHandler(broker)))
+
+	mux.HandleFunc("/", staticFileHandler)
 
 	log.Printf("Server running on http://localhost:%d 🚀", port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), mux); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
+}
+
+func staticFileHandler(w http.ResponseWriter, r *http.Request) {
+	// Strip the /itemchecklist/ prefix if present (for local dev compatibility)
+	path := r.URL.Path
+	path = strings.TrimPrefix(path, "/itemchecklist")
+
+	if path == "/" || path == "" {
+		path = "/index.html"
+	}
+
+	// Read the file from the public directory
+	filePath := filepath.Join("public", path)
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Set the correct Content-Type based on file extension
+	contentType := "text/plain"
+	switch filepath.Ext(filePath) {
+	case ".html":
+		contentType = "text/html; charset=utf-8"
+	case ".css":
+		contentType = "text/css; charset=utf-8"
+	case ".js":
+		contentType = "application/javascript; charset=utf-8"
+	case ".json":
+		contentType = "application/json; charset=utf-8"
+	case ".png":
+		contentType = "image/png"
+	case ".jpg", ".jpeg":
+		contentType = "image/jpeg"
+	case ".gif":
+		contentType = "image/gif"
+	case ".svg":
+		contentType = "image/svg+xml"
+	case ".ico":
+		contentType = "image/x-icon"
+	case ".woff":
+		contentType = "font/woff"
+	case ".woff2":
+		contentType = "font/woff2"
+	case ".ttf":
+		contentType = "font/ttf"
+	case ".eot":
+		contentType = "application/vnd.ms-fontobject"
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	w.Write(data)
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
