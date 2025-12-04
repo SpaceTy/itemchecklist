@@ -599,7 +599,7 @@ input:-webkit-autofill:focus {
 /* Fuzzy match highlighting */
 mark.fuzzy-match {
     background: #41577a;
-    color: #0b1120;
+    color: #ffffff;
     padding: 2px 1px;
     border-radius: 3px;
     font-weight: 700;
