@@ -1,0 +1,259 @@
++-----------------------------------+-------+---------+-----------+
+| Material List for schematic 'Mountain - Fixed' (1 of 1 regions) |
++-----------------------------------+-------+---------+-----------+
+| Item                              | Total | Missing | Available |
++-----------------------------------+-------+---------+-----------+
+| Grass Block                       | 49106 |   49106 |       620 |
+| Pale Moss Block                   | 13919 |   13919 |         0 |
+| Tuff                              | 12737 |   12737 |         0 |
+| Cyan Terracotta                   | 10981 |   10981 |         0 |
+| Spruce Leaves                     | 10200 |   10200 |         0 |
+| Stone                             |  5561 |    5561 |         0 |
+| Acacia Leaves                     |  4734 |    4734 |        53 |
+| Birch Leaves                      |  4600 |    4600 |        68 |
+| Spruce Fence                      |  2955 |    2955 |         0 |
+| Andesite                          |  2367 |    2367 |         0 |
+| White Stained Glass               |  1740 |    1740 |         0 |
+| Deepslate                         |  1721 |    1721 |         0 |
+| Mud Brick Wall                    |  1128 |    1128 |         0 |
+| Spruce Trapdoor                   |   979 |     979 |         0 |
+| Jungle Fence                      |   895 |     895 |         0 |
+| Dirt                              |   706 |     706 |         0 |
+| Bone Block                        |   550 |     550 |        20 |
+| Pale Oak Fence                    |   534 |     534 |         0 |
+| Tuff Wall                         |   507 |     507 |         0 |
+| Spruce Fence Gate                 |   463 |     463 |         0 |
+| Polished Tuff                     |   435 |     435 |         0 |
+| Smooth Sandstone                  |   375 |     375 |         0 |
+| Waxed Weathered Cut Copper        |   357 |     357 |         0 |
+| Polished Tuff Wall                |   293 |     293 |         0 |
+| Birch Planks                      |   264 |     264 |         0 |
+| Diorite Wall                      |   260 |     260 |         0 |
+| Polished Andesite                 |   245 |     245 |         0 |
+| Oak Log                           |   234 |     234 |         0 |
+| Brown Stained Glass Pane          |   205 |     205 |         0 |
+| Acacia Log                        |   195 |     195 |         0 |
+| Stripped Spruce Log               |   195 |     195 |         0 |
+| Jungle Trapdoor                   |   190 |     190 |         0 |
+| Polished Tuff Slab                |   184 |     184 |         0 |
+| Prismarine Bricks                 |   169 |     169 |         0 |
+| Andesite Wall                     |   159 |     159 |         0 |
+| Mushroom Stem                     |   155 |     155 |         0 |
+| Crimson Nylium                    |   152 |     152 |         0 |
+| Spruce Slab                       |   141 |     141 |         0 |
+| Spruce Planks                     |   131 |     131 |         0 |
+| Spruce Stairs                     |   130 |     130 |         0 |
+| Dark Prismarine                   |   116 |     116 |         0 |
+| Jungle Fence Gate                 |   114 |     114 |         0 |
+| Stripped Jungle Log               |   112 |     112 |         0 |
+| Waxed Weathered Cut Copper Slab   |   111 |     111 |         0 |
+| Red Concrete                      |   106 |     106 |         0 |
+| Waxed Weathered Cut Copper Stairs |   105 |     105 |         0 |
+| Granite Wall                      |   100 |     100 |         0 |
+| Spruce Shelf                      |    95 |      95 |         0 |
+| Pale Oak Planks                   |    92 |      92 |         0 |
+| Prismarine Wall                   |    90 |      90 |         0 |
+| End Stone Brick Wall              |    86 |      86 |         0 |
+| Sandstone                         |    72 |      72 |         0 |
+| Stripped Oak Log                  |    72 |      72 |         0 |
+| Waxed Exposed Copper Bars         |    71 |      71 |         0 |
+| Pale Oak Slab                     |    68 |      68 |         0 |
+| Polished Tuff Stairs              |    68 |      68 |         0 |
+| Prismarine Brick Stairs           |    60 |      60 |         0 |
+| Red Mushroom                      |    58 |      58 |         0 |
+| Nether Bricks                     |    57 |      57 |         0 |
+| Waxed Weathered Copper Trapdoor   |    57 |      57 |         0 |
+| Coarse Dirt                       |    55 |      55 |         0 |
+| Mangrove Fence                    |    55 |      55 |         0 |
+| Red Nether Bricks                 |    55 |      55 |         0 |
+| Jungle Planks                     |    54 |      54 |         0 |
+| Polished Andesite Stairs          |    54 |      54 |         0 |
+| Short Grass                       |    54 |      54 |        17 |
+| Dark Prismarine Slab              |    53 |      53 |         0 |
+| Oak Stairs                        |    52 |      52 |         0 |
+| Mangrove Log                      |    51 |      51 |         0 |
+| Oak Planks                        |    50 |      50 |         0 |
+| Polished Deepslate                |    49 |      49 |         0 |
+| Weeping Vines                     |    49 |      49 |         0 |
+| Netherrack                        |    47 |      47 |         0 |
+| Waxed Weathered Chiselled Copper  |    47 |      47 |         0 |
+| Moss Block                        |    45 |      45 |         0 |
+| White Stained Glass Pane          |    45 |      45 |         0 |
+| Barrel                            |    44 |      44 |         0 |
+| Muddy Mangrove Roots              |    44 |      44 |         0 |
+| Stripped Dark Oak Log             |    44 |      44 |         0 |
+| Mangrove Planks                   |    43 |      43 |         0 |
+| Mud                               |    43 |      43 |         0 |
+| Crimson Hyphae                    |    42 |      42 |         0 |
+| Crimson Roots                     |    42 |      42 |         0 |
+| Pale Oak Stairs                   |    42 |      42 |         0 |
+| Waxed Weathered Copper Bulb       |    41 |      41 |         0 |
+| Iron Bars                         |    40 |      40 |         0 |
+| Pale Oak Trapdoor                 |    40 |      40 |         0 |
+| Andesite Slab                     |    37 |      37 |         0 |
+| Mossy Cobblestone                 |    37 |      37 |         0 |
+| Polished Deepslate Stairs         |    36 |      36 |         0 |
+| Soul Soil                         |    36 |      36 |         0 |
+| Prismarine Brick Slab             |    35 |      35 |         0 |
+| Yellow Glazed Terracotta          |    35 |      35 |         0 |
+| Nether Gold Ore                   |    34 |      34 |         0 |
+| Oak Slab                          |    33 |      33 |         0 |
+| Smooth Sandstone Slab             |    33 |      33 |         0 |
+| Smooth Stone                      |    33 |      33 |         0 |
+| Dark Oak Leaves                   |    32 |      32 |         0 |
+| Grey Concrete                     |    32 |      32 |         0 |
+| Smooth Stone Slab                 |    32 |      32 |         0 |
+| Flower Pot                        |    31 |      31 |         0 |
+| Light Grey Stained Glass Pane     |    31 |      31 |         0 |
+| Oak Trapdoor                      |    31 |      31 |         0 |
+| Green Concrete                    |    30 |      30 |         0 |
+| Spruce Sapling                    |    30 |      30 |         0 |
+| Deepslate Tile Stairs             |    29 |      29 |         0 |
+| Block of Stripped Bamboo          |    28 |      28 |         0 |
+| Crimson Stem                      |    28 |      28 |         0 |
+| Prismarine Stairs                 |    28 |      28 |         0 |
+| Crimson Fungus                    |    27 |      27 |         0 |
+| Nether Brick Wall                 |    27 |      27 |         0 |
+| Deepslate Brick Stairs            |    26 |      26 |         0 |
+| Polished Deepslate Slab           |    26 |      26 |         0 |
+| Lapis Lazuli Ore                  |    23 |      23 |         0 |
+| Bamboo Trapdoor                   |    22 |      22 |         0 |
+| End Stone Brick Stairs            |    22 |      22 |         0 |
+| Sandstone Slab                    |    22 |      22 |         0 |
+| Stripped Mangrove Log             |    22 |      22 |         0 |
+| Light Grey Wool                   |    21 |      21 |         0 |
+| Prismarine                        |    21 |      21 |         0 |
+| Oak Fence                         |    20 |      20 |         0 |
+| Waxed Weathered Copper            |    20 |      20 |         0 |
+| Spruce Sign                       |    19 |      19 |         0 |
+| Calcite                           |    18 |      18 |         0 |
+| Dark Prismarine Stairs            |    18 |      18 |         0 |
+| Lime Stained Glass Pane           |    18 |      18 |         0 |
+| Dried Kelp Block                  |    17 |      17 |         0 |
+| Acacia Trapdoor                   |    16 |      16 |         0 |
+| Bamboo                            |    16 |      16 |         0 |
+| Bamboo Shelf                      |    16 |      16 |         0 |
+| Chest                             |    16 |      16 |         0 |
+| Dark Oak Slab                     |    16 |      16 |         0 |
+| Stripped Jungle Wood              |    16 |      16 |         0 |
+| Acacia Wood                       |    15 |      15 |         0 |
+| Birch Stairs                      |    15 |      15 |         0 |
+| Block of Bamboo                   |    15 |      15 |         0 |
+| Diorite                           |    15 |      15 |         0 |
+| Jungle Stairs                     |    15 |      15 |         0 |
+| Moss Carpet                       |    15 |      15 |         0 |
+| Polished Andesite Slab            |    15 |      15 |         0 |
+| Sand                              |    15 |      15 |         0 |
+| Waxed Weathered Copper Chain      |    15 |      15 |         0 |
+| Lime Glazed Terracotta            |    14 |      14 |         0 |
+| Mangrove Trapdoor                 |    14 |      14 |         0 |
+| Pearlescent Froglight             |    14 |      14 |         0 |
+| Light Grey Concrete Powder        |    13 |      13 |         0 |
+| Mossy Cobblestone Slab            |    13 |      13 |         0 |
+| Waxed Exposed Copper Trapdoor     |    13 |      13 |         0 |
+| End Stone Bricks                  |    12 |      12 |         0 |
+| Sandstone Wall                    |    12 |      12 |         0 |
+| Dark Oak Trapdoor                 |    11 |      11 |         0 |
+| Deepslate Tile Slab               |    11 |      11 |         0 |
+| Smooth Sandstone Stairs           |    11 |      11 |         0 |
+| String                            |    11 |      11 |         0 |
+| Polished Deepslate Wall           |    10 |      10 |         0 |
+| Dark Oak Shelf                    |     9 |       9 |         0 |
+| Grey Stained Glass Pane           |     9 |       9 |         0 |
+| Green Stained Glass Pane          |     8 |       8 |         0 |
+| Green Terracotta                  |     8 |       8 |         0 |
+| Red Mushroom Block                |     8 |       8 |         0 |
+| Sandstone Stairs                  |     8 |       8 |         0 |
+| Stripped Birch Log                |     8 |       8 |         0 |
+| Cyan Glazed Terracotta            |     7 |       7 |         0 |
+| Cyan Stained Glass Pane           |     7 |       7 |         0 |
+| Dark Oak Fence                    |     7 |       7 |         0 |
+| Green Glazed Terracotta           |     7 |       7 |         0 |
+| Large Fern                        |     7 |       7 |         0 |
+| Mangrove Fence Gate               |     7 |       7 |         0 |
+| Conduit                           |     6 |       6 |         0 |
+| Cyan Bed                          |     6 |       6 |         0 |
+| Dark Oak Stairs                   |     6 |       6 |         0 |
+| End Rod                           |     6 |       6 |         0 |
+| Glow Lichen                       |     6 |       6 |       128 |
+| Grey Carpet                       |     6 |       6 |         0 |
+| Grindstone                        |     6 |       6 |         0 |
+| Waxed Exposed Copper Bulb         |     6 |       6 |         0 |
+| Waxed Exposed Cut Copper          |     6 |       6 |         0 |
+| Waxed Exposed Cut Copper Stairs   |     6 |       6 |         0 |
+| Andesite Stairs                   |     5 |       5 |         0 |
+| Dark Oak Sign                     |     5 |       5 |         0 |
+| Firefly Bush                      |     5 |       5 |        26 |
+| Spruce Door                       |     5 |       5 |         0 |
+| Bamboo Stairs                     |     4 |       4 |         0 |
+| Birch Fence Gate                  |     4 |       4 |         0 |
+| Dark Oak Hanging Sign             |     4 |       4 |         0 |
+| Fern                              |     4 |       4 |        22 |
+| Grey Bed                          |     4 |       4 |         0 |
+| Heavy Core                        |     4 |       4 |         0 |
+| Light Blue Carpet                 |     4 |       4 |         0 |
+| Lime Carpet                       |     4 |       4 |         0 |
+| Mossy Stone Brick Stairs          |     4 |       4 |         0 |
+| Oak Shelf                         |     4 |       4 |         0 |
+| Orange Carpet                     |     4 |       4 |         0 |
+| Pale Oak Shelf                    |     4 |       4 |         0 |
+| Sea Lantern                       |     4 |       4 |         0 |
+| Stripped Pale Oak Log             |     4 |       4 |         0 |
+| Tuff Bricks                       |     4 |       4 |         0 |
+| Waxed Exposed Copper Grate        |     4 |       4 |         0 |
+| Dark Oak Door                     |     3 |       3 |         0 |
+| Jungle Slab                       |     3 |       3 |         0 |
+| Redstone Torch                    |     3 |       3 |        51 |
+| Snow Block                        |     3 |       3 |         0 |
+| Spruce Hanging Sign               |     3 |       3 |         0 |
+| Azalea Leaves                     |     2 |       2 |        53 |
+| Birch Trapdoor                    |     2 |       2 |         0 |
+| Black Stained Glass Pane          |     2 |       2 |         0 |
+| Blast Furnace                     |     2 |       2 |         0 |
+| Crimson Shelf                     |     2 |       2 |         0 |
+| Crimson Slab                      |     2 |       2 |         0 |
+| Decorated Pot                     |     2 |       2 |         0 |
+| Green Shulker Box                 |     2 |       2 |         1 |
+| Jack O'Lantern                    |     2 |       2 |         0 |
+| Loom                              |     2 |       2 |         0 |
+| Melon                             |     2 |       2 |         0 |
+| Mossy Stone Brick Slab            |     2 |       2 |         0 |
+| Mossy Stone Brick Wall            |     2 |       2 |         0 |
+| Mossy Stone Bricks                |     2 |       2 |         0 |
+| Orange Concrete                   |     2 |       2 |         0 |
+| Pumpkin                           |     2 |       2 |         0 |
+| Purple Bed                        |     2 |       2 |         0 |
+| Smoker                            |     2 |       2 |         0 |
+| Waxed Copper Lantern              |     2 |       2 |         0 |
+| Waxed Exposed Chiselled Copper    |     2 |       2 |         0 |
+| Waxed Exposed Lightning Rod       |     2 |       2 |         0 |
+| Azalea                            |     1 |       1 |         0 |
+| Black Wool                        |     1 |       1 |         0 |
+| Blue Concrete                     |     1 |       1 |         0 |
+| Cake                              |     1 |       1 |         0 |
+| Cyan Stained Glass                |     1 |       1 |         0 |
+| Daylight Detector                 |     1 |       1 |         0 |
+| Dried Ghast                       |     1 |       1 |         0 |
+| Green Wool                        |     1 |       1 |         0 |
+| Hopper                            |     1 |       1 |        23 |
+| Ladder                            |     1 |       1 |         0 |
+| Light Blue Wool                   |     1 |       1 |         0 |
+| Light Grey Carpet                 |     1 |       1 |         0 |
+| Light Grey Stained Glass          |     1 |       1 |         0 |
+| Mangrove Stairs                   |     1 |       1 |         0 |
+| Ochre Froglight                   |     1 |       1 |         0 |
+| Orange Wool                       |     1 |       1 |         0 |
+| Pink Wool                         |     1 |       1 |         0 |
+| Purple Carpet                     |     1 |       1 |         0 |
+| Red Wool                          |     1 |       1 |         0 |
+| Scaffolding                       |     1 |       1 |        60 |
+| Soul Lantern                      |     1 |       1 |         0 |
+| Soul Sand                         |     1 |       1 |         0 |
+| Torch                             |     1 |       1 |         0 |
+| Tuff Brick Wall                   |     1 |       1 |         0 |
+| Waxed Oxidized Copper Trapdoor    |     1 |       1 |         0 |
+| White Wool                        |     1 |       1 |         0 |
+| Yellow Carpet                     |     1 |       1 |         0 |
++-----------------------------------+-------+---------+-----------+
+| Item                              | Total | Missing | Available |
++-----------------------------------+-------+---------+-----------+

@@ -1,0 +1,1508 @@
+[
+  {
+    "name": "Grass Block",
+    "target": 49106,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Pale Moss Block",
+    "target": 13919,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Tuff",
+    "target": 12737,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Cyan Terracotta",
+    "target": 10981,
+    "gathered": 10981,
+    "claims": null
+  },
+  {
+    "name": "Spruce Leaves",
+    "target": 10200,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Stone",
+    "target": 5561,
+    "gathered": 5561,
+    "claims": null
+  },
+  {
+    "name": "Acacia Leaves",
+    "target": 4734,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Birch Leaves",
+    "target": 4600,
+    "gathered": 4600,
+    "claims": null
+  },
+  {
+    "name": "Spruce Fence",
+    "target": 2955,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Andesite",
+    "target": 2367,
+    "gathered": 2367,
+    "claims": null
+  },
+  {
+    "name": "White Stained Glass",
+    "target": 1740,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Deepslate",
+    "target": 1721,
+    "gathered": 1721,
+    "claims": null
+  },
+  {
+    "name": "Mud Brick Wall",
+    "target": 1128,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Spruce Trapdoor",
+    "target": 979,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Jungle Fence",
+    "target": 895,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dirt",
+    "target": 706,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Bone Block",
+    "target": 550,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Pale Oak Fence",
+    "target": 534,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Tuff Wall",
+    "target": 507,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Spruce Fence Gate",
+    "target": 463,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Polished Tuff",
+    "target": 435,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Smooth Sandstone",
+    "target": 375,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Weathered Cut Copper",
+    "target": 357,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Polished Tuff Wall",
+    "target": 293,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Birch Planks",
+    "target": 264,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Diorite Wall",
+    "target": 260,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Polished Andesite",
+    "target": 245,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Oak Log",
+    "target": 234,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Brown Stained Glass Pane",
+    "target": 205,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Acacia Log",
+    "target": 195,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Stripped Spruce Log",
+    "target": 195,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Jungle Trapdoor",
+    "target": 190,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Polished Tuff Slab",
+    "target": 184,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Prismarine Bricks",
+    "target": 169,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Andesite Wall",
+    "target": 159,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mushroom Stem",
+    "target": 155,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Crimson Nylium",
+    "target": 152,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Spruce Slab",
+    "target": 141,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Spruce Planks",
+    "target": 131,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Spruce Stairs",
+    "target": 130,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dark Prismarine",
+    "target": 116,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Jungle Fence Gate",
+    "target": 114,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Stripped Jungle Log",
+    "target": 112,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Weathered Cut Copper Slab",
+    "target": 111,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Red Concrete",
+    "target": 106,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Weathered Cut Copper Stairs",
+    "target": 105,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Granite Wall",
+    "target": 100,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Spruce Shelf",
+    "target": 95,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Pale Oak Planks",
+    "target": 92,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Prismarine Wall",
+    "target": 90,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "End Stone Brick Wall",
+    "target": 86,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Sandstone",
+    "target": 72,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Stripped Oak Log",
+    "target": 72,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Exposed Copper Bars",
+    "target": 71,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Pale Oak Slab",
+    "target": 68,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Polished Tuff Stairs",
+    "target": 68,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Prismarine Brick Stairs",
+    "target": 60,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Red Mushroom",
+    "target": 58,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Nether Bricks",
+    "target": 57,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Weathered Copper Trapdoor",
+    "target": 57,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Coarse Dirt",
+    "target": 55,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mangrove Fence",
+    "target": 55,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Red Nether Bricks",
+    "target": 55,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Jungle Planks",
+    "target": 54,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Polished Andesite Stairs",
+    "target": 54,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Short Grass",
+    "target": 54,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dark Prismarine Slab",
+    "target": 53,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Oak Stairs",
+    "target": 52,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mangrove Log",
+    "target": 51,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Oak Planks",
+    "target": 50,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Polished Deepslate",
+    "target": 49,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Weeping Vines",
+    "target": 49,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Netherrack",
+    "target": 47,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Weathered Chiselled Copper",
+    "target": 47,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Moss Block",
+    "target": 45,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "White Stained Glass Pane",
+    "target": 45,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Barrel",
+    "target": 44,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Muddy Mangrove Roots",
+    "target": 44,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Stripped Dark Oak Log",
+    "target": 44,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mangrove Planks",
+    "target": 43,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mud",
+    "target": 43,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Crimson Hyphae",
+    "target": 42,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Crimson Roots",
+    "target": 42,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Pale Oak Stairs",
+    "target": 42,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Weathered Copper Bulb",
+    "target": 41,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Iron Bars",
+    "target": 40,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Pale Oak Trapdoor",
+    "target": 40,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Andesite Slab",
+    "target": 37,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mossy Cobblestone",
+    "target": 37,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Polished Deepslate Stairs",
+    "target": 36,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Soul Soil",
+    "target": 36,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Prismarine Brick Slab",
+    "target": 35,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Yellow Glazed Terracotta",
+    "target": 35,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Nether Gold Ore",
+    "target": 34,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Oak Slab",
+    "target": 33,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Smooth Sandstone Slab",
+    "target": 33,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Smooth Stone",
+    "target": 33,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dark Oak Leaves",
+    "target": 32,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Grey Concrete",
+    "target": 32,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Smooth Stone Slab",
+    "target": 32,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Flower Pot",
+    "target": 31,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Light Grey Stained Glass Pane",
+    "target": 31,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Oak Trapdoor",
+    "target": 31,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Green Concrete",
+    "target": 30,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Spruce Sapling",
+    "target": 30,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Deepslate Tile Stairs",
+    "target": 29,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Block of Stripped Bamboo",
+    "target": 28,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Crimson Stem",
+    "target": 28,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Prismarine Stairs",
+    "target": 28,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Crimson Fungus",
+    "target": 27,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Nether Brick Wall",
+    "target": 27,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Deepslate Brick Stairs",
+    "target": 26,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Polished Deepslate Slab",
+    "target": 26,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Lapis Lazuli Ore",
+    "target": 23,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Bamboo Trapdoor",
+    "target": 22,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "End Stone Brick Stairs",
+    "target": 22,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Sandstone Slab",
+    "target": 22,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Stripped Mangrove Log",
+    "target": 22,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Light Grey Wool",
+    "target": 21,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Prismarine",
+    "target": 21,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Oak Fence",
+    "target": 20,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Weathered Copper",
+    "target": 20,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Spruce Sign",
+    "target": 19,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Calcite",
+    "target": 18,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dark Prismarine Stairs",
+    "target": 18,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Lime Stained Glass Pane",
+    "target": 18,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dried Kelp Block",
+    "target": 17,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Acacia Trapdoor",
+    "target": 16,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Bamboo",
+    "target": 16,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Bamboo Shelf",
+    "target": 16,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Chest",
+    "target": 16,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dark Oak Slab",
+    "target": 16,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Stripped Jungle Wood",
+    "target": 16,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Acacia Wood",
+    "target": 15,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Birch Stairs",
+    "target": 15,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Block of Bamboo",
+    "target": 15,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Diorite",
+    "target": 15,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Jungle Stairs",
+    "target": 15,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Moss Carpet",
+    "target": 15,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Polished Andesite Slab",
+    "target": 15,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Sand",
+    "target": 15,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Weathered Copper Chain",
+    "target": 15,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Lime Glazed Terracotta",
+    "target": 14,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mangrove Trapdoor",
+    "target": 14,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Pearlescent Froglight",
+    "target": 14,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Light Grey Concrete Powder",
+    "target": 13,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mossy Cobblestone Slab",
+    "target": 13,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Exposed Copper Trapdoor",
+    "target": 13,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "End Stone Bricks",
+    "target": 12,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Sandstone Wall",
+    "target": 12,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dark Oak Trapdoor",
+    "target": 11,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Deepslate Tile Slab",
+    "target": 11,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Smooth Sandstone Stairs",
+    "target": 11,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "String",
+    "target": 11,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Polished Deepslate Wall",
+    "target": 10,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dark Oak Shelf",
+    "target": 9,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Grey Stained Glass Pane",
+    "target": 9,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Green Stained Glass Pane",
+    "target": 8,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Green Terracotta",
+    "target": 8,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Red Mushroom Block",
+    "target": 8,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Sandstone Stairs",
+    "target": 8,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Stripped Birch Log",
+    "target": 8,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Cyan Glazed Terracotta",
+    "target": 7,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Cyan Stained Glass Pane",
+    "target": 7,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dark Oak Fence",
+    "target": 7,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Green Glazed Terracotta",
+    "target": 7,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Large Fern",
+    "target": 7,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mangrove Fence Gate",
+    "target": 7,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Conduit",
+    "target": 6,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Cyan Bed",
+    "target": 6,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dark Oak Stairs",
+    "target": 6,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "End Rod",
+    "target": 6,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Glow Lichen",
+    "target": 6,
+    "gathered": 128,
+    "claims": null
+  },
+  {
+    "name": "Grey Carpet",
+    "target": 6,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Grindstone",
+    "target": 6,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Exposed Copper Bulb",
+    "target": 6,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Exposed Cut Copper",
+    "target": 6,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Exposed Cut Copper Stairs",
+    "target": 6,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Andesite Stairs",
+    "target": 5,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dark Oak Sign",
+    "target": 5,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Firefly Bush",
+    "target": 5,
+    "gathered": 26,
+    "claims": null
+  },
+  {
+    "name": "Spruce Door",
+    "target": 5,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Bamboo Stairs",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Birch Fence Gate",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dark Oak Hanging Sign",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Fern",
+    "target": 4,
+    "gathered": 22,
+    "claims": null
+  },
+  {
+    "name": "Grey Bed",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Heavy Core",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Light Blue Carpet",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Lime Carpet",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mossy Stone Brick Stairs",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Oak Shelf",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Orange Carpet",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Pale Oak Shelf",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Sea Lantern",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Stripped Pale Oak Log",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Tuff Bricks",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Exposed Copper Grate",
+    "target": 4,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dark Oak Door",
+    "target": 3,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Jungle Slab",
+    "target": 3,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Redstone Torch",
+    "target": 3,
+    "gathered": 51,
+    "claims": null
+  },
+  {
+    "name": "Snow Block",
+    "target": 3,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Spruce Hanging Sign",
+    "target": 3,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Azalea Leaves",
+    "target": 2,
+    "gathered": 53,
+    "claims": null
+  },
+  {
+    "name": "Birch Trapdoor",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Black Stained Glass Pane",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Blast Furnace",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Crimson Shelf",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Crimson Slab",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Decorated Pot",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Green Shulker Box",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Jack O'Lantern",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Loom",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Melon",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mossy Stone Brick Slab",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mossy Stone Brick Wall",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mossy Stone Bricks",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Orange Concrete",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Pumpkin",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Purple Bed",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Smoker",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Copper Lantern",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Exposed Chiselled Copper",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Exposed Lightning Rod",
+    "target": 2,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Azalea",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Black Wool",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Blue Concrete",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Cake",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Cyan Stained Glass",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Daylight Detector",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Dried Ghast",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Green Wool",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Hopper",
+    "target": 1,
+    "gathered": 23,
+    "claims": null
+  },
+  {
+    "name": "Ladder",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Light Blue Wool",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Light Grey Carpet",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Light Grey Stained Glass",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Mangrove Stairs",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Ochre Froglight",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Orange Wool",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Pink Wool",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Purple Carpet",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Red Wool",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Scaffolding",
+    "target": 1,
+    "gathered": 60,
+    "claims": null
+  },
+  {
+    "name": "Soul Lantern",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Soul Sand",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Torch",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Tuff Brick Wall",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Waxed Oxidized Copper Trapdoor",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "White Wool",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  },
+  {
+    "name": "Yellow Carpet",
+    "target": 1,
+    "gathered": 0,
+    "claims": null
+  }
+]
