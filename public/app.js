@@ -3,12 +3,16 @@ const loginRow = document.getElementById("login");
 const msg = document.getElementById("loginMsg");
 const claimBtn = document.getElementById("claimToggle");
 const claimLabel = document.getElementById("claimLabel");
+const completionToggle = document.getElementById("completionToggle");
+const completionLabel = document.getElementById("completionLabel");
+const completionBar = document.getElementById('completion-bar');
 const sortBtn = document.getElementById("sortBtn");
 const sortModeEl = document.getElementById("sortMode");
 const finishedPriorityEl = document.getElementById("finishedPriority");
 const searchInput = document.getElementById("searchInput");
 const clearSearchBtn = document.getElementById("clearSearch");
 let claimMode = false;
+let completionMode = false; // false = panel based, true = item based
 let lastUpdate = {};
 let dragActive = false;
 let pendingRender = null;
@@ -26,11 +30,31 @@ function computeTotalCompletion(items) {
   return { totalGathered, totalTarget };
 }
 
+function computeItemBasedCompletion(items) {
+  let totalRatio = 0;
+  let count = 0;
+  items.forEach(item => {
+    if (item.target > 0) {
+      totalRatio += item.gathered / item.target;
+      count++;
+    }
+  });
+  return count > 0 ? totalRatio / count : 0;
+}
+
 function updateCompletionBar(items) {
   const bar = document.getElementById('completion-bar');
   if (!bar) return;
-  const { totalGathered, totalTarget } = computeTotalCompletion(items);
-  const percent = totalTarget > 0 ? Math.round((totalGathered / totalTarget) * 100) : 0;
+  let percent;
+  if (completionMode) {
+    // item based: average completion per item
+    const ratio = computeItemBasedCompletion(items);
+    percent = Math.round(ratio * 100);
+  } else {
+    // panel based: total gathered / total target
+    const { totalGathered, totalTarget } = computeTotalCompletion(items);
+    percent = totalTarget > 0 ? Math.round((totalGathered / totalTarget) * 100) : 0;
+  }
   const fill = bar.querySelector('.bar-fill');
   const label = bar.querySelector('.bar-label');
   if (fill) {
@@ -63,7 +87,17 @@ document.getElementById("loginBtn").onclick = async () => {
 };
 
 claimBtn.onchange = () => toggleClaimMode(claimBtn.checked);
+completionToggle.onchange = () => toggleCompletionMode(completionToggle.checked);
+if (completionBar) {
+  completionBar.onclick = () => {
+    completionToggle.checked = !completionToggle.checked;
+    toggleCompletionMode(completionToggle.checked);
+  };
+}
 sortBtn.onclick = () => performSort();
+
+// Initialize completion toggle label
+toggleCompletionMode(completionToggle.checked);
 
 // Fuzzy search implementation (fzf-like)
 function fuzzyMatch(pattern, str) {
@@ -162,6 +196,22 @@ function toggleClaimMode(enabled) {
   claimLabel.textContent = "Claim Mode";
   document.body.classList.toggle("claim-mode", claimMode);
   loadItems();
+}
+
+function toggleCompletionMode(enabled) {
+  completionMode = enabled;
+  completionToggle.checked = completionMode;
+  completionLabel.textContent = completionMode ? "Item Based" : "Panel Based";
+  if (completionBar) {
+    completionBar.classList.remove('item-based', 'panel-based');
+    completionBar.classList.add(completionMode ? 'item-based' : 'panel-based');
+    // Trigger animation
+    completionBar.classList.remove('animating');
+    void completionBar.offsetWidth; // trigger reflow
+    completionBar.classList.add('animating');
+    setTimeout(() => completionBar.classList.remove('animating'), 500);
+  }
+  updateCompletionBar(currentItems.length ? currentItems : allItems);
 }
 
 async function loadItems() {
