@@ -16,6 +16,31 @@ let currentItems = [];
 let searchQuery = "";
 let allItems = [];
 
+function computeTotalCompletion(items) {
+  let totalGathered = 0;
+  let totalTarget = 0;
+  items.forEach(item => {
+    totalGathered += item.gathered;
+    totalTarget += item.target;
+  });
+  return { totalGathered, totalTarget };
+}
+
+function updateCompletionBar(items) {
+  const bar = document.getElementById('completion-bar');
+  if (!bar) return;
+  const { totalGathered, totalTarget } = computeTotalCompletion(items);
+  const percent = totalTarget > 0 ? Math.round((totalGathered / totalTarget) * 100) : 0;
+  const fill = bar.querySelector('.bar-fill');
+  const label = bar.querySelector('.bar-label');
+  if (fill) {
+    fill.style.height = `${percent}%`;
+  }
+  if (label) {
+    label.textContent = `${percent}%`;
+  }
+}
+
 async function authCheck() {
   const ok = await fetch("api/check-auth").then(r => r.ok);
   loginRow.style.display = ok ? "none" : "flex";
@@ -358,7 +383,7 @@ function renderDirect(list) {
     const id = "g-" + safeId(item.name);
     const max = item.target;
     const displayName = item._matchIndices ? highlightMatches(item.name, item._matchIndices) : item.name;
-    card.innerHTML = `<div class="row"><div class="name">${displayName}</div><div class="count"><span id="${id}">${item.gathered}</span> / ${item.target}</div></div><div style="position:relative;padding-top:12px"><div class="claims"></div><input type="range" min="0" max="${max}" value="${item.gathered}" step="1"></div>`;
+    card.innerHTML = `<div class="row"><div class="name">${displayName}</div><div class="count"><span id="${id}">${item.gathered}</span> / ${item.target}</div></div><div style="position:relative;padding-bottom:12px"><div class="claims"></div><input type="range" min="0" max="${max}" value="${item.gathered}" step="1"></div>`;
     paintClaims(card.querySelector(".claims"), item);
     const slider = card.querySelector("input");
     setSliderVars(slider, max);
@@ -378,6 +403,7 @@ function renderDirect(list) {
     });
     itemsEl.appendChild(card);
   });
+  updateCompletionBar(list);
 }
 
 function render(list) {
