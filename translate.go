@@ -44,7 +44,7 @@ func main() {
 			}
 
 			total, err1 := strconv.Atoi(matches[2])
-			available, err2 := strconv.Atoi(matches[4])
+			available := 0
 
 			if err1 == nil && err2 == nil {
 				item := Item{
