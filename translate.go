@@ -1,4 +1,6 @@
-package main
+//go:build translate
+
+package translate
 
 import (
 	"encoding/json"

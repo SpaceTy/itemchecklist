@@ -1,3 +1,5 @@
+//go:build !translate
+
 package main
 
 import (
