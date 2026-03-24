@@ -17,7 +17,9 @@ const state = {
     completionMode: false,
     searchQuery: "",
     lastUpdate: {},
-    eventSource: null
+    eventSource: null,
+    dragActive: false,
+    pendingRender: null
 };
 
 const authCard = document.getElementById("authCard");
@@ -489,7 +491,64 @@ function renderListMenu() {
     });
 }
 
+function enableDrag(slider, max, onEndDrag) {
+    let dragging = false;
+    const endDrag = (event) => {
+        if (!dragging) return;
+        dragging = false;
+        state.dragActive = false;
+        window.removeEventListener("pointerup", endDrag);
+        window.removeEventListener("pointercancel", endDrag);
+        if (event) {
+            try { slider.releasePointerCapture(event.pointerId); } catch {}
+        }
+        if (state.pendingRender) {
+            const next = state.pendingRender;
+            state.pendingRender = null;
+            state.activeItems = next;
+            renderChecklist();
+        }
+        onEndDrag();
+    };
+    const setVal = (x) => {
+        const rect = slider.getBoundingClientRect();
+        const ratio = Math.min(Math.max((x - rect.left) / rect.width, 0), 1);
+        slider.value = Math.round(ratio * max);
+        slider.dispatchEvent(new Event("input"));
+    };
+    slider.onpointerdown = (event) => {
+        dragging = true;
+        state.dragActive = true;
+        window.addEventListener("pointerup", endDrag);
+        window.addEventListener("pointercancel", endDrag);
+        try { slider.setPointerCapture(event.pointerId); } catch {}
+        setVal(event.clientX);
+    };
+    slider.onpointermove = (event) => {
+        if (dragging) setVal(event.clientX);
+    };
+    slider.onpointerup = endDrag;
+    slider.onpointercancel = endDrag;
+}
+
+function sendSliderUpdate(item, value) {
+    if (state.claimMode) {
+        const remaining = Math.max(item.target - item.gathered, 0);
+        const claimed = Math.min(Math.max(value - item.gathered, 0), remaining);
+        claimItem(item.name, claimed);
+        return;
+    }
+    if (state.lastUpdate[item.name] === value) return;
+    state.lastUpdate[item.name] = value;
+    const delta = value - item.gathered;
+    updateItem(item.name, value, delta);
+}
+
 function renderChecklist() {
+    if (state.dragActive) {
+        state.pendingRender = state.activeItems;
+        return;
+    }
     itemsEl.innerHTML = "";
     const hasList = Boolean(state.activeListId);
     emptyChecklistEl.style.display = hasList ? "none" : "block";
@@ -526,22 +585,19 @@ function renderChecklist() {
         `;
 
         const slider = card.querySelector("input");
+        const countEl = card.querySelector(".item-count");
         slider.disabled = state.isFrozen;
-        slider.oninput = async (event) => {
-            const value = Number(event.target.value);
-            if (state.claimMode) {
-                const remaining = Math.max(item.target - item.gathered, 0);
-                const claimed = Math.min(Math.max(value - item.gathered, 0), remaining);
-                await claimItem(item.name, claimed);
-                return;
-            }
-            if (state.lastUpdate[item.name] === value) {
-                return;
-            }
-            state.lastUpdate[item.name] = value;
-            const delta = value - item.gathered;
-            await updateItem(item.name, value, delta);
+
+        slider.oninput = () => {
+            const value = Number(slider.value);
+            countEl.textContent = `${value} / ${item.target}`;
+            if (state.dragActive) return;
+            sendSliderUpdate(item, value);
         };
+
+        enableDrag(slider, item.target, () => {
+            sendSliderUpdate(item, Number(slider.value));
+        });
 
         paintClaims(card.querySelector(".claims"), item);
         itemsEl.appendChild(card);
@@ -672,8 +728,12 @@ function startStream() {
     state.eventSource.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data.type === "update" && data.list_id === state.activeListId) {
-            state.activeItems = data.items;
-            renderChecklist();
+            if (state.dragActive) {
+                state.pendingRender = data.items;
+            } else {
+                state.activeItems = data.items;
+                renderChecklist();
+            }
         }
     };
     state.eventSource.onerror = () => stopStream();

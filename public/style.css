@@ -271,7 +271,51 @@ code {
     padding-bottom: 20px;
 }
 
-input[type="range"] { accent-color: var(--accent); }
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+    touch-action: none;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+}
+
+input[type="range"]::-moz-range-track {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    border: 0;
+}
+
+input[type="range"]::-moz-range-progress {
+    height: 8px;
+    background: var(--accent);
+    border-radius: 999px;
+    border: 0;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--text);
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    margin-top: -4px;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--text);
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+}
 
 .claims {
     position: absolute;
