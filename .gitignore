@@ -3,6 +3,7 @@ backups/
 node_modules/
 items.json
 users.json
+secret.key
 raw.md
 node-archive/
 AGENTS.md

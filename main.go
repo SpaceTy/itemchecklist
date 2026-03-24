@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -17,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -25,6 +27,8 @@ const (
 	usersPath  = "users.json"
 	itemsPath  = "items.json"
 	backupsDir = "backups"
+	secretPath = "secret.key"
+	tokenTTL   = 30 * 24 * time.Hour
 )
 
 // ── User types ───────────────────────────────────────────────────────────────
@@ -128,38 +132,56 @@ func (b *sseBroker) broadcast(msg string) {
 	}
 }
 
-// ── Session management ────────────────────────────────────────────────────────
+// ── JWT helpers ───────────────────────────────────────────────────────────────
 
-var (
-	sessionsMu sync.RWMutex
-	sessions   = make(map[string]string) // token → username
-)
+var jwtSecret []byte
 
-func generateToken() (string, error) {
+func loadOrCreateSecret() {
+	data, err := os.ReadFile(secretPath)
+	if err == nil {
+		jwtSecret = bytes.TrimSpace(data)
+		return
+	}
+	if !os.IsNotExist(err) {
+		log.Fatalf("reading JWT secret: %v", err)
+	}
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
-		return "", err
+		log.Fatalf("generating JWT secret: %v", err)
 	}
-	return hex.EncodeToString(b), nil
+	secret := hex.EncodeToString(b)
+	if err := os.WriteFile(secretPath, []byte(secret), 0600); err != nil {
+		log.Fatalf("writing JWT secret: %v", err)
+	}
+	jwtSecret = []byte(secret)
+	log.Printf("Created JWT secret in %s", secretPath)
 }
 
-func setSession(token, username string) {
-	sessionsMu.Lock()
-	defer sessionsMu.Unlock()
-	sessions[token] = username
+func generateJWT(username string) (string, error) {
+	claims := jwt.RegisteredClaims{
+		Subject:   username,
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenTTL)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(jwtSecret)
 }
 
-func getSession(token string) (string, bool) {
-	sessionsMu.RLock()
-	defer sessionsMu.RUnlock()
-	u, ok := sessions[token]
-	return u, ok
-}
-
-func deleteSession(token string) {
-	sessionsMu.Lock()
-	defer sessionsMu.Unlock()
-	delete(sessions, token)
+func verifyJWT(tokenString string) (string, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{},
+		func(t *jwt.Token) (any, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			}
+			return jwtSecret, nil
+		})
+	if err != nil || !token.Valid {
+		return "", fmt.Errorf("invalid token")
+	}
+	claims, ok := token.Claims.(*jwt.RegisteredClaims)
+	if !ok {
+		return "", fmt.Errorf("invalid claims")
+	}
+	return claims.Subject, nil
 }
 
 // ── Context key ───────────────────────────────────────────────────────────────
@@ -177,8 +199,8 @@ func requireAuth(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
 			return
 		}
-		username, ok := getSession(cookie.Value)
-		if !ok {
+		username, err := verifyJWT(cookie.Value)
+		if err != nil {
 			http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
 			return
 		}
@@ -202,6 +224,8 @@ func requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 // ── main ──────────────────────────────────────────────────────────────────────
 
 func main() {
+	loadOrCreateSecret()
+
 	if err := os.MkdirAll(backupsDir, 0755); err != nil {
 		log.Fatalf("creating backups dir: %v", err)
 	}
@@ -328,18 +352,17 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := generateToken()
+	token, err := generateJWT(u.Username)
 	if err != nil {
 		http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
 		return
 	}
-	setSession(token, u.Username)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
 		Value:    token,
 		Path:     "/itemchecklist/",
-		MaxAge:   30 * 24 * 60 * 60,
+		MaxAge:   int(tokenTTL.Seconds()),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -404,18 +427,17 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Auto-login after registration.
-	token, err := generateToken()
+	token, err := generateJWT(newUser.Username)
 	if err != nil {
 		http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
 		return
 	}
-	setSession(token, newUser.Username)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
 		Value:    token,
 		Path:     "/itemchecklist/",
-		MaxAge:   30 * 24 * 60 * 60,
+		MaxAge:   int(tokenTTL.Seconds()),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -427,10 +449,6 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
-	}
-
-	if cookie, err := r.Cookie("auth_token"); err == nil {
-		deleteSession(cookie.Value)
 	}
 
 	http.SetCookie(w, &http.Cookie{
