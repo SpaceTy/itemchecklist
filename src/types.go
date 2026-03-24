@@ -55,6 +55,79 @@ type contribution struct {
 	Amount   int    `json:"amount"`
 }
 
+type inviteCode struct {
+	Code      string `json:"code"`
+	CreatedAt string `json:"created_at"`
+	CreatedBy string `json:"created_by"`
+}
+
+type itemList struct {
+	ID            string       `json:"id"`
+	Name          string       `json:"name"`
+	OwnerUsername string       `json:"owner_username"`
+	Collaborators []string     `json:"collaborators"`
+	InviteCodes   []inviteCode `json:"invite_codes"`
+	Items         []item       `json:"items"`
+	CreatedAt     string       `json:"created_at"`
+	UpdatedAt     string       `json:"updated_at"`
+}
+
+type listSummary struct {
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	OwnerUsername string   `json:"owner_username"`
+	Role          string   `json:"role"`
+	CanManage     bool     `json:"can_manage"`
+	ItemCount     int      `json:"item_count"`
+	Collaborators []string `json:"collaborators"`
+	UpdatedAt     string   `json:"updated_at"`
+}
+
+type listDetail struct {
+	ID            string       `json:"id"`
+	Name          string       `json:"name"`
+	OwnerUsername string       `json:"owner_username"`
+	Role          string       `json:"role"`
+	CanManage     bool         `json:"can_manage"`
+	Collaborators []string     `json:"collaborators"`
+	InviteCodes   []inviteCode `json:"invite_codes"`
+	Items         []item       `json:"items"`
+	CreatedAt     string       `json:"created_at"`
+	UpdatedAt     string       `json:"updated_at"`
+}
+
+type createListRequest struct {
+	Name string `json:"name"`
+}
+
+type updateListRequest struct {
+	Name          string `json:"name"`
+	Action        string `json:"action"`
+	TransferOwner string `json:"transfer_owner"`
+}
+
+type joinListRequest struct {
+	Code string `json:"code"`
+}
+
+type memberRequest struct {
+	Username string `json:"username"`
+}
+
+type inviteRequest struct {
+	Code string `json:"code"`
+}
+
+type upsertItemRequest struct {
+	Name         string `json:"name"`
+	OriginalName string `json:"original_name"`
+	Target       int    `json:"target"`
+}
+
+type deleteItemRequest struct {
+	Name string `json:"name"`
+}
+
 type updateItemRequest struct {
 	Name     string `json:"name"`
 	Gathered int    `json:"gathered"`
@@ -67,6 +140,7 @@ type claimItemRequest struct {
 }
 
 type sseMessage struct {
-	Type  string `json:"type"`
-	Items []item `json:"items"`
+	Type   string `json:"type"`
+	ListID string `json:"list_id"`
+	Items  []item `json:"items"`
 }

@@ -1,828 +1,1055 @@
+const state = {
+    currentUser: null,
+    isAdmin: false,
+    isFrozen: false,
+    registrationLockedDown: false,
+    accessibleLists: [],
+    allLists: [],
+    users: [],
+    activeListId: localStorage.getItem("activeListId") || "",
+    activeList: null,
+    activeItems: [],
+    managedOwnerListId: "",
+    managedAdminListId: "",
+    ownerManagedList: null,
+    adminManagedList: null,
+    claimMode: false,
+    completionMode: false,
+    searchQuery: "",
+    lastUpdate: {},
+    eventSource: null
+};
+
+const authCard = document.getElementById("authCard");
+const appView = document.getElementById("appView");
+const sessionBar = document.getElementById("sessionBar");
+const currentUserEl = document.getElementById("currentUser");
+const userStateBadgeEl = document.getElementById("userStateBadge");
+const activeListTitleEl = document.getElementById("activeListTitle");
+const activeListMetaEl = document.getElementById("activeListMeta");
+const globalStatusEl = document.getElementById("globalStatus");
+const inviteCodeInput = document.getElementById("inviteCodeInput");
+const joinListBtn = document.getElementById("joinListBtn");
 const itemsEl = document.getElementById("items");
-const loginRow = document.getElementById("login");
-const claimBtn = document.getElementById("claimToggle");
-const claimLabel = document.getElementById("claimLabel");
+const emptyChecklistEl = document.getElementById("emptyChecklist");
+const listChooserEl = document.getElementById("listChooser");
+const claimToggle = document.getElementById("claimToggle");
 const completionToggle = document.getElementById("completionToggle");
 const completionLabel = document.getElementById("completionLabel");
-const completionBar = document.getElementById('completion-bar');
-const sortBtn = document.getElementById("sortBtn");
-const sortModeEl = document.getElementById("sortMode");
-const finishedPriorityEl = document.getElementById("finishedPriority");
+const completionBar = document.getElementById("completion-bar");
 const searchInput = document.getElementById("searchInput");
 const clearSearchBtn = document.getElementById("clearSearch");
+const sortModeEl = document.getElementById("sortMode");
+const finishedPriorityEl = document.getElementById("finishedPriority");
+const ownedListsEl = document.getElementById("ownedLists");
+const ownerManageCardEl = document.getElementById("ownerManageCard");
+const adminManageCardEl = document.getElementById("adminManageCard");
+const adminListsEl = document.getElementById("adminLists");
+const adminNavBtn = document.getElementById("adminNavBtn");
 const adminStatusEl = document.getElementById("adminStatus");
 const registrationLockBtn = document.getElementById("registrationLockBtn");
 const registrationLockStateEl = document.getElementById("registrationLockState");
-let claimMode = false;
-let completionMode = false; // false = panel based, true = item based
-let lastUpdate = {};
-let dragActive = false;
-let pendingRender = null;
-let currentItems = [];
-let searchQuery = "";
-let allItems = [];
-let currentUsername = null;
-let isAdmin = false;
-let isFrozen = false;
-let eventSource = null;
-let registrationLockedDown = false;
+const userListEl = document.getElementById("userList");
 
-function setAdminStatus(message, kind = "info") {
-  if (!adminStatusEl) return;
-  adminStatusEl.textContent = message;
-  adminStatusEl.className = `admin-status ${kind}`;
-}
+document.getElementById("showRegister").onclick = (event) => {
+    event.preventDefault();
+    document.getElementById("loginPanel").style.display = "none";
+    document.getElementById("registerPanel").style.display = "flex";
+};
 
-function setContributionAvailability() {
-  claimBtn.disabled = isFrozen;
-  completionToggle.disabled = false;
-  if (isFrozen) {
-    claimMode = false;
-    claimBtn.checked = false;
-    document.body.classList.remove("claim-mode");
-    claimLabel.textContent = "Frozen";
-    document.getElementById("currentUser").textContent = `${currentUsername} (frozen)`;
-  } else {
-    claimLabel.textContent = "Claim Mode";
-    document.getElementById("currentUser").textContent = currentUsername || "";
-  }
-}
-
-function renderRegistrationLockState() {
-  if (!registrationLockBtn || !registrationLockStateEl) return;
-  registrationLockBtn.textContent = registrationLockedDown ? "Unlock Registration" : "Lock Registration";
-  registrationLockBtn.classList.toggle("btn-warning", !registrationLockedDown);
-  registrationLockBtn.classList.toggle("btn-danger", registrationLockedDown);
-  registrationLockStateEl.textContent = registrationLockedDown
-    ? "Registration lockdown is on. New accounts are created frozen."
-    : "Registration lockdown is off. New accounts can contribute immediately.";
-}
-
-function computeTotalCompletion(items) {
-  let totalGathered = 0;
-  let totalTarget = 0;
-  items.forEach(item => {
-    totalGathered += item.gathered;
-    totalTarget += item.target;
-  });
-  return { totalGathered, totalTarget };
-}
-
-function computeItemBasedCompletion(items) {
-  let totalRatio = 0;
-  let count = 0;
-  items.forEach(item => {
-    if (item.target > 0) {
-      totalRatio += item.gathered / item.target;
-      count++;
-    }
-  });
-  return count > 0 ? totalRatio / count : 0;
-}
-
-function updateCompletionBar(items) {
-  const bar = document.getElementById('completion-bar');
-  if (!bar) return;
-  let percent;
-  if (completionMode) {
-    // item based: average completion per item
-    const ratio = computeItemBasedCompletion(items);
-    percent = Math.round(ratio * 100);
-  } else {
-    // panel based: total gathered / total target
-    const { totalGathered, totalTarget } = computeTotalCompletion(items);
-    percent = totalTarget > 0 ? Math.round((totalGathered / totalTarget) * 100) : 0;
-  }
-  const fill = bar.querySelector('.bar-fill');
-  const label = bar.querySelector('.bar-label');
-  if (fill) {
-    fill.style.height = `${percent}%`;
-  }
-  if (label) {
-    label.textContent = `${percent}%`;
-  }
-}
-
-async function authCheck() {
-  const res = await fetch("api/check-auth");
-  if (res.ok) {
-    const data = await res.json();
-    currentUsername = data.username;
-    isAdmin = data.admin;
-    isFrozen = Boolean(data.frozen);
-    loginRow.style.display = "none";
-    document.getElementById("userBar").style.display = "flex";
-    setContributionAvailability();
-    if (isAdmin) {
-      document.getElementById("adminPanel").style.display = "block";
-      setAdminStatus("Use Remove Edits to revoke one account's contributions and claims.", "info");
-      loadAdminSettings();
-      loadAdminUsers();
-    } else {
-      document.getElementById("adminPanel").style.display = "none";
-    }
-    loadItems();
-    startStream();
-  } else {
-    currentUsername = null;
-    isAdmin = false;
-    isFrozen = false;
-    loginRow.style.display = "flex";
-    document.getElementById("userBar").style.display = "none";
-    document.getElementById("adminPanel").style.display = "none";
-    setAdminStatus("", "info");
-  }
-}
+document.getElementById("showLogin").onclick = (event) => {
+    event.preventDefault();
+    document.getElementById("registerPanel").style.display = "none";
+    document.getElementById("loginPanel").style.display = "flex";
+};
 
 document.getElementById("loginBtn").onclick = async () => {
-  const msgEl = document.getElementById("loginMsg");
-  msgEl.textContent = "";
-  const username = document.getElementById("loginUsername").value.trim();
-  const password = document.getElementById("loginPassword").value;
-  const res = await fetch("api/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password })
-  });
-  if (res.ok) {
-    authCheck();
-  } else {
-    const data = await res.json().catch(() => ({}));
-    msgEl.textContent = data.error || "Login failed";
-  }
+    const payload = {
+        username: document.getElementById("loginUsername").value.trim(),
+        password: document.getElementById("loginPassword").value
+    };
+    const result = await api("api/login", { method: "POST", body: payload });
+    if (!result.ok) {
+        document.getElementById("loginMsg").textContent = result.error || "Login failed";
+        return;
+    }
+    document.getElementById("loginMsg").textContent = "";
+    await authCheck();
 };
 
 document.getElementById("registerBtn").onclick = async () => {
-  const msgEl = document.getElementById("registerMsg");
-  msgEl.textContent = "";
-  const username = document.getElementById("regUsername").value.trim();
-  const password = document.getElementById("regPassword").value;
-  const res = await fetch("api/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password })
-  });
-  if (res.ok) {
-    authCheck();
-  } else {
-    const data = await res.json().catch(() => ({}));
-    msgEl.textContent = data.error || "Registration failed";
-  }
-};
-
-document.getElementById("showRegister").onclick = (e) => {
-  e.preventDefault();
-  document.getElementById("loginPanel").style.display = "none";
-  document.getElementById("registerPanel").style.display = "flex";
-};
-
-document.getElementById("showLogin").onclick = (e) => {
-  e.preventDefault();
-  document.getElementById("registerPanel").style.display = "none";
-  document.getElementById("loginPanel").style.display = "flex";
+    const payload = {
+        username: document.getElementById("regUsername").value.trim(),
+        password: document.getElementById("regPassword").value
+    };
+    const result = await api("api/register", { method: "POST", body: payload });
+    if (!result.ok) {
+        document.getElementById("registerMsg").textContent = result.error || "Registration failed";
+        return;
+    }
+    document.getElementById("registerMsg").textContent = "";
+    await authCheck();
 };
 
 document.getElementById("logoutBtn").onclick = async () => {
-  if (eventSource) {
-    eventSource.close();
-    eventSource = null;
-  }
-  await fetch("api/logout", { method: "POST" });
-  currentUsername = null;
-  isAdmin = false;
-  isFrozen = false;
-  itemsEl.innerHTML = "";
-  currentItems = [];
-  allItems = [];
-  authCheck();
+    stopStream();
+    await api("api/logout", { method: "POST" });
+    localStorage.removeItem("activeListId");
+    state.currentUser = null;
+    state.activeListId = "";
+    state.activeList = null;
+    state.activeItems = [];
+    renderSession();
+    await authCheck();
 };
 
-claimBtn.onchange = () => toggleClaimMode(claimBtn.checked);
-completionToggle.onchange = () => toggleCompletionMode(completionToggle.checked);
-if (completionBar) {
-  completionBar.onclick = () => {
-    completionToggle.checked = !completionToggle.checked;
-    toggleCompletionMode(completionToggle.checked);
-  };
-}
-sortBtn.onclick = () => performSort();
-
-// Initialize completion toggle label
-toggleCompletionMode(completionToggle.checked);
-
-// Fuzzy search implementation (fzf-like)
-function fuzzyMatch(pattern, str) {
-  if (!pattern) return { matched: true, score: 0, indices: [] };
-
-  pattern = pattern.toLowerCase();
-  str = str.toLowerCase();
-
-  let patternIdx = 0;
-  let strIdx = 0;
-  const indices = [];
-  let score = 0;
-  let consecutiveMatches = 0;
-
-  while (patternIdx < pattern.length && strIdx < str.length) {
-    if (pattern[patternIdx] === str[strIdx]) {
-      indices.push(strIdx);
-
-      // Bonus for consecutive matches
-      if (indices.length > 1 && indices[indices.length - 1] === indices[indices.length - 2] + 1) {
-        consecutiveMatches++;
-        score += 5 + consecutiveMatches; // Increasing bonus for longer sequences
-      } else {
-        consecutiveMatches = 0;
-        score += 1;
-      }
-
-      // Bonus for matching at word start
-      if (strIdx === 0 || str[strIdx - 1] === ' ' || str[strIdx - 1] === '-' || str[strIdx - 1] === '_') {
-        score += 8;
-      }
-
-      patternIdx++;
+document.getElementById("createListForm").onsubmit = async (event) => {
+    event.preventDefault();
+    const input = document.getElementById("createListName");
+    const result = await api("api/lists", {
+        method: "POST",
+        body: { name: input.value.trim() }
+    });
+    if (!result.ok) {
+        setGlobalStatus(result.error || "Could not create list", "error");
+        return;
     }
-    strIdx++;
-  }
-
-  const matched = patternIdx === pattern.length;
-  if (matched) {
-    // Penalty for gaps
-    const gaps = indices.length > 0 ? indices[indices.length - 1] - indices[0] - indices.length + 1 : 0;
-    score -= gaps * 0.5;
-
-    // Bonus for shorter strings (preferring exact/closer matches)
-    score += (1 / (str.length + 1)) * 10;
-  }
-
-  return { matched, score: matched ? score : -Infinity, indices };
-}
-
-function filterAndSortBySearch(items, query) {
-  if (!query.trim()) return items;
-
-  const results = items.map(item => ({
-    item,
-    match: fuzzyMatch(query, item.name)
-  }))
-  .filter(({ match }) => match.matched)
-  .sort((a, b) => b.match.score - a.match.score);
-
-  return results.map(({ item, match }) => ({ ...item, _matchIndices: match.indices }));
-}
-
-searchInput.oninput = (e) => {
-  searchQuery = e.target.value;
-  clearSearchBtn.style.display = searchQuery ? "block" : "none";
-  applySearchFilter();
+    input.value = "";
+    setGlobalStatus(`Created "${result.data.list.name}".`, "success");
+    await refreshAllData();
+    setActiveList(result.data.list.id);
+    state.managedOwnerListId = result.data.list.id;
+    await loadManagedOwnerList();
 };
 
-searchInput.onkeydown = (e) => {
-  if (e.key === "Escape") {
-    searchInput.value = "";
-    searchQuery = "";
-    clearSearchBtn.style.display = "none";
-    applySearchFilter();
-  }
+joinListBtn.onclick = async () => {
+    const code = inviteCodeInput.value.trim();
+    if (!code) {
+        setGlobalStatus("Enter an invite code first.", "error");
+        return;
+    }
+    const result = await api("api/lists/join", {
+        method: "POST",
+        body: { code }
+    });
+    if (!result.ok) {
+        setGlobalStatus(result.error || "Could not join list.", "error");
+        return;
+    }
+    inviteCodeInput.value = "";
+    setGlobalStatus(`Joined "${result.data.list.name}".`, "success");
+    await refreshAllData();
+    setActiveList(result.data.list.id);
+};
+
+claimToggle.onchange = () => {
+    state.claimMode = claimToggle.checked;
+};
+
+completionToggle.onchange = () => {
+    state.completionMode = completionToggle.checked;
+    completionLabel.textContent = state.completionMode ? "Item Based" : "Panel Based";
+    updateCompletionBar();
+};
+
+searchInput.oninput = () => {
+    state.searchQuery = searchInput.value;
+    clearSearchBtn.style.display = state.searchQuery ? "inline-flex" : "none";
+    renderChecklist();
 };
 
 clearSearchBtn.onclick = () => {
-  searchInput.value = "";
-  searchQuery = "";
-  clearSearchBtn.style.display = "none";
-  applySearchFilter();
-  searchInput.focus();
+    searchInput.value = "";
+    state.searchQuery = "";
+    clearSearchBtn.style.display = "none";
+    renderChecklist();
 };
 
-function applySearchFilter() {
-  const filtered = filterAndSortBySearch(allItems, searchQuery);
-  const ordered = searchQuery ? filtered : applySortOrder(filtered);
-  renderDirect(ordered);
-}
+sortModeEl.onchange = () => renderChecklist();
+finishedPriorityEl.onchange = () => renderChecklist();
 
-function toggleClaimMode(enabled) {
-  claimMode = enabled;
-  claimBtn.checked = claimMode;
-  claimLabel.textContent = "Claim Mode";
-  document.body.classList.toggle("claim-mode", claimMode);
-  loadItems();
-}
+completionBar.onclick = () => {
+    completionToggle.checked = !completionToggle.checked;
+    completionToggle.dispatchEvent(new Event("change"));
+};
 
-function toggleCompletionMode(enabled) {
-  completionMode = enabled;
-  completionToggle.checked = completionMode;
-  completionLabel.textContent = completionMode ? "Item Based" : "Panel Based";
-  if (completionBar) {
-    completionBar.classList.remove('item-based', 'panel-based');
-    completionBar.classList.add(completionMode ? 'item-based' : 'panel-based');
-    // Trigger animation
-    completionBar.classList.remove('animating');
-    void completionBar.offsetWidth; // trigger reflow
-    completionBar.classList.add('animating');
-    setTimeout(() => completionBar.classList.remove('animating'), 500);
-  }
-  updateCompletionBar(currentItems.length ? currentItems : allItems);
-}
-
-async function loadItems() {
-  const res = await fetch("api/items");
-  if (!res.ok) {
-    itemsEl.textContent = "Auth required";
-    return;
-  }
-  render(await res.json());
-}
-
-const safeId = name => name.replace(/[^a-z0-9]/gi, "-");
-
-// LocalStorage utilities for storing sort order
-function saveSortOrder(items) {
-  const order = items.map(item => item.name);
-  try {
-    localStorage.setItem('sortOrder', JSON.stringify(order));
-  } catch (e) {
-    console.error('Failed to save sort order to localStorage:', e);
-  }
-}
-
-function loadSortOrder() {
-  try {
-    const stored = localStorage.getItem('sortOrder');
-    return stored ? JSON.parse(stored) : null;
-  } catch (e) {
-    console.error('Failed to load sort order from localStorage:', e);
-    return null;
-  }
-}
-
-function applySortOrder(items) {
-  const storedOrder = loadSortOrder();
-  if (!storedOrder) return items;
-
-  // Create a map for quick lookup
-  const itemMap = new Map(items.map(item => [item.name, item]));
-  const sorted = [];
-
-  // Add items in stored order
-  storedOrder.forEach(name => {
-    if (itemMap.has(name)) {
-      sorted.push(itemMap.get(name));
-      itemMap.delete(name);
-    }
-  });
-
-  // Add any new items that weren't in stored order
-  itemMap.forEach(item => sorted.push(item));
-
-  return sorted;
-}
-
-function sortItems(items) {
-  const sortMode = sortModeEl.value;
-  const finishedPriority = finishedPriorityEl.value;
-
-  if (sortMode === "none") return items;
-
-  const sorted = [...items];
-
-  // First apply the main sort
-  sorted.sort((a, b) => {
-    const aCompleted = a.gathered >= a.target;
-    const bCompleted = b.gathered >= b.target;
-
-    // Apply finished priority if not neutral
-    if (finishedPriority !== "neutral") {
-      if (aCompleted !== bCompleted) {
-        if (finishedPriority === "first") {
-          return aCompleted ? -1 : 1;
-        } else { // last
-          return aCompleted ? 1 : -1;
-        }
-      }
-    }
-
-    // Then apply the selected sort mode
-    switch (sortMode) {
-      case "alphabetical":
-        return a.name.localeCompare(b.name);
-      case "progress":
-        const aProgress = a.target > 0 ? a.gathered / a.target : 0;
-        const bProgress = b.target > 0 ? b.gathered / b.target : 0;
-        return bProgress - aProgress; // Descending
-      case "target":
-        return b.target - a.target; // Descending
-      default:
-        return 0;
-    }
-  });
-
-  return sorted;
-}
-
-function performSort() {
-  if (!currentItems.length) return;
-
-  const sorted = sortItems(currentItems);
-  renderWithAnimation(sorted);
-}
-
-function renderWithAnimation(newList) {
-  if (dragActive) {
-    pendingRender = newList;
-    return;
-  }
-
-  // Save the sort order to cookies
-  saveSortOrder(newList);
-
-  // Get current positions of all cards
-  const cards = Array.from(itemsEl.children);
-  const oldPositions = new Map();
-
-  cards.forEach((card, index) => {
-    const rect = card.getBoundingClientRect();
-    const itemName = currentItems[index]?.name;
-    if (itemName) {
-      oldPositions.set(itemName, {
-        top: rect.top,
-        left: rect.left,
-        element: card
-      });
-    }
-  });
-
-  // Render new order (skip applying stored order since we're providing it)
-  renderDirect(newList);
-
-  // Get new positions and check which are visible
-  const newCards = Array.from(itemsEl.children);
-  const viewportHeight = window.innerHeight;
-  const animations = [];
-
-  newCards.forEach((card, index) => {
-    const itemName = newList[index]?.name;
-    const oldPos = oldPositions.get(itemName);
-
-    if (oldPos) {
-      const newRect = card.getBoundingClientRect();
-      const deltaY = oldPos.top - newRect.top;
-      const deltaX = oldPos.left - newRect.left;
-
-      // Only animate if card is visible or becomes visible
-      const isVisible = (newRect.top < viewportHeight && newRect.bottom > 0) ||
-                       (oldPos.top < viewportHeight && oldPos.top > 0);
-
-      if (isVisible && (Math.abs(deltaY) > 1 || Math.abs(deltaX) > 1)) {
-        animations.push({ card, deltaX, deltaY });
-      }
-    }
-  });
-
-  // Perform animations
-  if (animations.length > 0) {
-    animations.forEach(({ card, deltaX, deltaY }) => {
-      card.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-      card.style.transition = "none";
+registrationLockBtn.onclick = async () => {
+    const nextValue = !state.registrationLockedDown;
+    setAdminStatus(`${nextValue ? "Enabling" : "Disabling"} registration lockdown...`, "info");
+    const result = await api("api/admin/settings", {
+        method: "POST",
+        body: { registration_locked_down: nextValue }
     });
-
-    // Force reflow
-    itemsEl.offsetHeight;
-
-    // Animate to final positions with staggered delay for better tracking
-    animations.forEach(({ card }, index) => {
-      const delay = index * 0.02; // 20ms stagger between each card
-      card.style.transition = `transform 1.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${delay}s`;
-      card.style.transform = "translate(0, 0)";
-    });
-
-    // Clean up after animation (duration + max stagger delay)
-    const maxDelay = animations.length * 0.02;
-    setTimeout(() => {
-      animations.forEach(({ card }) => {
-        card.style.transition = "";
-        card.style.transform = "";
-      });
-    }, 1800 + maxDelay * 1000);
-  }
-}
-
-function setSliderVars(slider, max) {
-  slider.style.setProperty("--min", 0);
-  slider.style.setProperty("--max", max);
-  slider.style.setProperty("--value", slider.value || 0);
-}
-
-function highlightMatches(text, indices) {
-  if (!indices || indices.length === 0) {
-    return text;
-  }
-
-  const indicesSet = new Set(indices);
-  return text.split('').map((char, i) => {
-    if (indicesSet.has(i)) {
-      return `<mark class="fuzzy-match">${char}</mark>`;
-    }
-    return char;
-  }).join('');
-}
-
-function renderDirect(list) {
-  // Render without applying stored order (used when we already have sorted list)
-  if (dragActive) {
-    pendingRender = list;
-    return;
-  }
-  pendingRender = null;
-  currentItems = list;
-
-  itemsEl.innerHTML = "";
-  list.forEach(item => {
-    const card = document.createElement("div");
-    const isCompleted = item.gathered >= item.target;
-    card.className = isCompleted ? "card completed" : "card";
-    const id = "g-" + safeId(item.name);
-    const max = item.target;
-    const displayName = item._matchIndices ? highlightMatches(item.name, item._matchIndices) : item.name;
-    card.innerHTML = `<div class="row"><div class="name">${displayName}</div><div class="count"><span id="${id}">${item.gathered}</span> / ${item.target}</div></div><div style="position:relative;padding-bottom:12px"><div class="claims"></div><input type="range" min="0" max="${max}" value="${item.gathered}" step="1"></div>`;
-    paintClaims(card.querySelector(".claims"), item);
-    const slider = card.querySelector("input");
-    setSliderVars(slider, max);
-    slider.oninput = e => {
-      setSliderVars(slider, max);
-      if (dragActive) {
-        if (!claimMode) {
-          const count = document.getElementById(id);
-          if (count) count.textContent = +e.target.value;
-        }
+    if (!result.ok) {
+        setAdminStatus(result.error || "Could not update settings.", "error");
         return;
-      }
-      update(item, id, +e.target.value);
-    };
-    enableDrag(slider, max, () => {
-      update(item, id, +slider.value);
+    }
+    state.registrationLockedDown = nextValue;
+    renderAdminSettings();
+    setAdminStatus("Registration settings updated.", "success");
+};
+
+document.querySelectorAll(".nav-btn").forEach((button) => {
+    button.onclick = () => setView(button.dataset.view);
+});
+
+function api(path, options = {}) {
+    const fetchOptions = { method: options.method || "GET", headers: {} };
+    if (options.body !== undefined) {
+        fetchOptions.headers["Content-Type"] = "application/json";
+        fetchOptions.body = JSON.stringify(options.body);
+    }
+    return fetch(path, fetchOptions)
+        .then(async (response) => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                return { ok: false, status: response.status, error: data.error || "Request failed" };
+            }
+            return { ok: true, status: response.status, data };
+        })
+        .catch(() => ({ ok: false, status: 0, error: "Network error" }));
+}
+
+async function authCheck() {
+    const result = await api("api/check-auth");
+    if (!result.ok) {
+        authCard.style.display = "block";
+        appView.style.display = "none";
+        sessionBar.style.display = "none";
+        stopStream();
+        return;
+    }
+
+    state.currentUser = result.data.username;
+    state.isAdmin = Boolean(result.data.admin);
+    state.isFrozen = Boolean(result.data.frozen);
+
+    authCard.style.display = "none";
+    appView.style.display = "block";
+    sessionBar.style.display = "flex";
+    adminNavBtn.style.display = state.isAdmin ? "inline-flex" : "none";
+
+    renderSession();
+    await refreshAllData();
+    if (!state.activeListId && state.accessibleLists.length > 0) {
+        setActiveList(state.accessibleLists[0].id);
+    } else if (state.activeListId) {
+        await loadActiveListItems();
+    } else {
+        renderHero();
+        renderChecklist();
+    }
+}
+
+async function refreshAllData() {
+    const listsResult = await api("api/lists");
+    if (listsResult.ok) {
+        state.accessibleLists = listsResult.data;
+    }
+
+    if (state.isAdmin) {
+        const [settingsResult, usersResult, allListsResult] = await Promise.all([
+            api("api/admin/settings"),
+            api("api/admin/users"),
+            api("api/lists?scope=all")
+        ]);
+        if (settingsResult.ok) {
+            state.registrationLockedDown = Boolean(settingsResult.data.registration_locked_down);
+        }
+        if (usersResult.ok) {
+            state.users = usersResult.data;
+        }
+        if (allListsResult.ok) {
+            state.allLists = allListsResult.data;
+        }
+        renderAdmin();
+    } else {
+        state.users = [];
+        state.allLists = [];
+    }
+
+    if (state.activeListId && !state.accessibleLists.find((list) => list.id === state.activeListId)) {
+        state.activeListId = state.accessibleLists[0]?.id || "";
+        localStorage.setItem("activeListId", state.activeListId);
+    }
+
+    if (!state.managedOwnerListId || !state.accessibleLists.find((list) => list.id === state.managedOwnerListId && list.can_manage)) {
+        state.managedOwnerListId = state.accessibleLists.find((list) => list.can_manage)?.id || "";
+    }
+
+    if (state.isAdmin && (!state.managedAdminListId || !state.allLists.find((list) => list.id === state.managedAdminListId))) {
+        state.managedAdminListId = state.allLists[0]?.id || "";
+    }
+
+    renderHero();
+    renderListChooser();
+    renderOwnedLists();
+    await loadManagedOwnerList();
+    if (state.isAdmin) {
+        await loadManagedAdminList();
+    }
+}
+
+function renderSession() {
+    currentUserEl.textContent = state.currentUser || "";
+    if (!state.currentUser) {
+        userStateBadgeEl.textContent = "";
+        return;
+    }
+
+    const badges = [];
+    if (state.isAdmin) {
+        badges.push("admin");
+    }
+    if (state.isFrozen) {
+        badges.push("frozen");
+    }
+    userStateBadgeEl.textContent = badges.join(" · ") || "member";
+}
+
+function setView(viewName) {
+    document.querySelectorAll(".view-section").forEach((view) => {
+        view.style.display = view.id === `view-${viewName}` ? "block" : "none";
     });
-    itemsEl.appendChild(card);
-  });
-  updateCompletionBar(list);
-}
-
-function render(list) {
-  // Store all items for searching
-  allItems = list;
-  // If there's a search query, apply it; otherwise use stored sort order
-  if (searchQuery) {
-    applySearchFilter();
-  } else {
-    const orderedList = applySortOrder(list);
-    renderDirect(orderedList);
-  }
-}
-
-function paintClaims(el, item) {
-  el.innerHTML = "";
-  (item.claims || []).forEach(c => {
-    const w = item.target || 1;
-    const start = (100 * c.claim_start) / w;
-    const end = (100 * c.claim_end) / w;
-    const bar = document.createElement("div");
-    bar.style = `left:${start}%;width:${Math.max(end - start, 1)}%`;
-    const label = document.createElement("span");
-    label.textContent = c.claimer;
-    label.style.left = `${start}%`;
-    // Only show the clear button for the current user's own claim.
-    if (c.claimer === currentUsername) {
-      const clear = () => clearClaim(item.name);
-      bar.onclick = clear;
-      label.onclick = clear;
-      bar.title = "Click to remove your claim";
-      label.style.cursor = "pointer";
-    }
-    el.append(label, bar);
-  });
-}
-
-async function update(item, id, val) {
-  if (isFrozen) return;
-  if (claimMode) {
-    const remaining = Math.max(item.target - item.gathered, 0);
-    const claimed = Math.min(Math.max(val - item.gathered, 0), remaining);
-    await fetch("api/items/claim", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: item.name, claimed })
+    document.querySelectorAll(".nav-btn").forEach((button) => {
+        button.classList.toggle("active", button.dataset.view === viewName);
     });
-    return;
-  }
-  if (lastUpdate[item.name] === val) return;
-  lastUpdate[item.name] = val;
-  const count = document.getElementById(id);
-  if (count) count.textContent = val;
-  const delta = val - item.gathered;
-  await fetch("api/items/update", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: item.name, gathered: val, delta })
-  });
+    if (viewName === "admin" && state.isAdmin) {
+        renderAdmin();
+    }
 }
 
-function enableDrag(slider, max, onEndDrag = () => {}) {
-  let dragging = false;
-  const removeListeners = () => {
-    window.removeEventListener("pointerup", endDrag);
-    window.removeEventListener("pointercancel", endDrag);
-  };
-  const endDrag = e => {
-    if (!dragging) return;
-    dragging = false;
-    dragActive = false;
-    removeListeners();
-    if (e) {
-      try {
-        slider.releasePointerCapture(e.pointerId);
-      } catch {}
-    }
-    if (pendingRender) {
-      const next = pendingRender;
-      pendingRender = null;
-      render(next);
-    }
-    onEndDrag();
-  };
-  const setVal = x => {
-    const r = slider.getBoundingClientRect();
-    const ratio = Math.min(Math.max((x - r.left) / r.width, 0), 1);
-    slider.value = Math.round(ratio * max);
-    slider.dispatchEvent(new Event("input"));
-  };
-  slider.onpointerdown = e => {
-    dragging = true;
-    dragActive = true;
-    window.addEventListener("pointerup", endDrag);
-    window.addEventListener("pointercancel", endDrag);
-    try {
-      slider.setPointerCapture(e.pointerId);
-    } catch {}
-    setVal(e.clientX);
-  };
-  slider.onpointermove = e => {
-    if (dragging) setVal(e.clientX);
-  };
-  slider.onpointerup = endDrag;
-  slider.onpointercancel = endDrag;
+function setActiveList(listID) {
+    state.activeListId = listID;
+    localStorage.setItem("activeListId", listID);
+    loadActiveListItems();
 }
 
-function clearClaim(itemName) {
-  if (isFrozen) return;
-  fetch("api/items/claim", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: itemName, claimed: 0 })
-  });
+async function loadActiveListItems() {
+    if (!state.activeListId) {
+        state.activeList = null;
+        state.activeItems = [];
+        renderHero();
+        renderChecklist();
+        stopStream();
+        return;
+    }
+
+    state.activeList = state.accessibleLists.find((list) => list.id === state.activeListId)
+        || state.allLists.find((list) => list.id === state.activeListId)
+        || null;
+
+    const result = await api(`api/lists/${state.activeListId}/items`);
+    if (!result.ok) {
+        setGlobalStatus(result.error || "Could not load list.", "error");
+        return;
+    }
+
+    state.activeItems = result.data;
+    state.lastUpdate = {};
+    renderHero();
+    renderChecklist();
+    startStream();
+}
+
+async function loadManagedOwnerList() {
+    if (!state.managedOwnerListId) {
+        state.ownerManagedList = null;
+        renderOwnerManageCard();
+        return;
+    }
+    const result = await api(`api/lists/${state.managedOwnerListId}`);
+    state.ownerManagedList = result.ok ? result.data : null;
+    renderOwnerManageCard();
+}
+
+async function loadManagedAdminList() {
+    if (!state.managedAdminListId || !state.isAdmin) {
+        state.adminManagedList = null;
+        renderAdminManageCard();
+        return;
+    }
+    const result = await api(`api/lists/${state.managedAdminListId}`);
+    state.adminManagedList = result.ok ? result.data : null;
+    renderAdminManageCard();
+}
+
+function renderHero() {
+    if (!state.activeList) {
+        activeListTitleEl.textContent = "No list selected";
+        activeListMetaEl.textContent = "Create a list or join one with an invite code.";
+        return;
+    }
+    activeListTitleEl.textContent = state.activeList.name;
+    activeListMetaEl.textContent = `${state.activeList.owner_username} · ${state.activeList.role} · ${state.activeList.item_count} items`;
+}
+
+function renderListChooser() {
+    listChooserEl.innerHTML = "";
+    if (state.accessibleLists.length === 0) {
+        listChooserEl.innerHTML = '<p class="muted">You do not have access to any lists yet.</p>';
+        return;
+    }
+
+    state.accessibleLists.forEach((list) => {
+        const button = document.createElement("button");
+        button.className = `chooser-pill ${list.id === state.activeListId ? "active" : ""}`;
+        button.textContent = `${list.name} (${list.role})`;
+        button.onclick = () => setActiveList(list.id);
+        listChooserEl.appendChild(button);
+    });
+}
+
+function renderChecklist() {
+    itemsEl.innerHTML = "";
+    const hasList = Boolean(state.activeListId);
+    emptyChecklistEl.style.display = hasList ? "none" : "block";
+    completionBar.style.display = hasList ? "flex" : "none";
+    claimToggle.disabled = !hasList || state.isFrozen;
+
+    if (!hasList) {
+        updateCompletionBar();
+        return;
+    }
+
+    const filtered = filterAndSortItems(state.activeItems, state.searchQuery);
+    if (filtered.length === 0) {
+        itemsEl.innerHTML = '<div class="empty-state compact">No items match this filter.</div>';
+        updateCompletionBar([]);
+        return;
+    }
+
+    filtered.forEach((item) => {
+        const card = document.createElement("article");
+        const complete = item.gathered >= item.target;
+        card.className = `item-card ${complete ? "complete" : ""}`;
+        const safeName = escapeHtml(item.name);
+        const highlighted = item._matchIndices ? highlightMatches(safeName, item._matchIndices) : safeName;
+        card.innerHTML = `
+            <div class="item-head">
+                <div class="item-name">${highlighted}</div>
+                <div class="item-count">${item.gathered} / ${item.target}</div>
+            </div>
+            <div class="slider-wrap">
+                <input type="range" min="0" max="${item.target}" value="${item.gathered}" step="1">
+                <div class="claims"></div>
+            </div>
+        `;
+
+        const slider = card.querySelector("input");
+        slider.disabled = state.isFrozen;
+        slider.oninput = async (event) => {
+            const value = Number(event.target.value);
+            if (state.claimMode) {
+                const remaining = Math.max(item.target - item.gathered, 0);
+                const claimed = Math.min(Math.max(value - item.gathered, 0), remaining);
+                await claimItem(item.name, claimed);
+                return;
+            }
+            if (state.lastUpdate[item.name] === value) {
+                return;
+            }
+            state.lastUpdate[item.name] = value;
+            const delta = value - item.gathered;
+            await updateItem(item.name, value, delta);
+        };
+
+        paintClaims(card.querySelector(".claims"), item);
+        itemsEl.appendChild(card);
+    });
+
+    updateCompletionBar(filtered);
+}
+
+function filterAndSortItems(items, query) {
+    let nextItems = [...items];
+
+    if (query.trim()) {
+        nextItems = nextItems
+            .map((item) => {
+                const match = fuzzyMatch(query, item.name);
+                return { ...item, _match: match };
+            })
+            .filter((item) => item._match.matched)
+            .sort((a, b) => b._match.score - a._match.score)
+            .map((item) => ({ ...item, _matchIndices: item._match.indices }));
+        return nextItems;
+    }
+
+    const sortMode = sortModeEl.value;
+    const finishedPriority = finishedPriorityEl.value;
+
+    nextItems.sort((a, b) => {
+        const aComplete = a.target > 0 && a.gathered >= a.target;
+        const bComplete = b.target > 0 && b.gathered >= b.target;
+
+        if (finishedPriority !== "neutral" && aComplete !== bComplete) {
+            return finishedPriority === "first" ? (aComplete ? -1 : 1) : (aComplete ? 1 : -1);
+        }
+
+        if (sortMode === "alphabetical") {
+            return a.name.localeCompare(b.name);
+        }
+        if (sortMode === "progress") {
+            const aRatio = a.target > 0 ? a.gathered / a.target : 0;
+            const bRatio = b.target > 0 ? b.gathered / b.target : 0;
+            return bRatio - aRatio;
+        }
+        if (sortMode === "target") {
+            return b.target - a.target;
+        }
+        return 0;
+    });
+
+    return nextItems;
+}
+
+function updateCompletionBar(items = state.activeItems) {
+    const list = items || [];
+    let percent = 0;
+
+    if (state.completionMode) {
+        let totalRatio = 0;
+        let count = 0;
+        list.forEach((item) => {
+            if (item.target > 0) {
+                totalRatio += item.gathered / item.target;
+                count += 1;
+            }
+        });
+        percent = count > 0 ? Math.round((totalRatio / count) * 100) : 0;
+        completionBar.classList.add("item-based");
+    } else {
+        const totals = list.reduce((acc, item) => {
+            acc.gathered += item.gathered;
+            acc.target += item.target;
+            return acc;
+        }, { gathered: 0, target: 0 });
+        percent = totals.target > 0 ? Math.round((totals.gathered / totals.target) * 100) : 0;
+        completionBar.classList.remove("item-based");
+    }
+
+    completionBar.querySelector(".bar-fill").style.height = `${percent}%`;
+    completionBar.querySelector(".bar-label").textContent = `${percent}%`;
+}
+
+function paintClaims(container, item) {
+    container.innerHTML = "";
+    (item.claims || []).forEach((claim) => {
+        const widthBase = item.target || 1;
+        const start = (100 * claim.claim_start) / widthBase;
+        const width = Math.max((100 * (claim.claim_end - claim.claim_start)) / widthBase, 1);
+        const chip = document.createElement("button");
+        chip.className = "claim-chip";
+        chip.style.left = `${start}%`;
+        chip.style.width = `${width}%`;
+        chip.textContent = claim.claimer;
+        chip.title = claim.claimer === state.currentUser ? "Click to clear your claim" : claim.claimer;
+        chip.disabled = claim.claimer !== state.currentUser;
+        chip.onclick = () => claimItem(item.name, 0);
+        container.appendChild(chip);
+    });
+}
+
+async function updateItem(name, gathered, delta) {
+    const result = await api(`api/lists/${state.activeListId}/items/update`, {
+        method: "POST",
+        body: { name, gathered, delta }
+    });
+    if (!result.ok) {
+        setGlobalStatus(result.error || "Could not update item.", "error");
+        await loadActiveListItems();
+    }
+}
+
+async function claimItem(name, claimed) {
+    const result = await api(`api/lists/${state.activeListId}/items/claim`, {
+        method: "POST",
+        body: { name, claimed }
+    });
+    if (!result.ok) {
+        setGlobalStatus(result.error || "Could not update claim.", "error");
+        await loadActiveListItems();
+    }
 }
 
 function startStream() {
-  if (eventSource) {
-    eventSource.close();
-    eventSource = null;
-  }
-  const connect = () => {
-    eventSource = new EventSource("events");
-    eventSource.onmessage = e => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.type === "update") render(data.items);
-      } catch {}
-    };
-    eventSource.onerror = () => {
-      eventSource.close();
-      eventSource = null;
-    };
-  };
-  // Defer until the page is fully loaded to avoid the browser warning
-  // "connection interrupted while page was loading".
-  if (document.readyState === "complete") {
-    connect();
-  } else {
-    window.addEventListener("load", connect, { once: true });
-  }
-}
-
-async function loadAdminUsers() {
-  const res = await fetch("api/admin/users");
-  if (!res.ok) return;
-  const users = await res.json();
-  renderAdminUsers(users);
-}
-
-async function loadAdminSettings() {
-  const res = await fetch("api/admin/settings");
-  if (!res.ok) return;
-  const settings = await res.json();
-  registrationLockedDown = Boolean(settings.registration_locked_down);
-  renderRegistrationLockState();
-}
-
-function renderAdminUsers(users) {
-  const list = document.getElementById("userList");
-  list.innerHTML = "";
-  if (users.length === 0) {
-    list.innerHTML = '<p style="color:#64748b;margin:0">No users yet.</p>';
-    return;
-  }
-  users.forEach(u => {
-    const row = document.createElement("div");
-    row.className = "user-row";
-    row.innerHTML = `
-      <span class="user-name">${u.username}${u.admin ? ' <span class="admin-badge">admin</span>' : ''}${u.frozen ? ' <span class="frozen-badge">frozen</span>' : ''}</span>
-      <div class="user-actions">
-        <button class="btn-sm ${u.frozen ? '' : 'btn-warning'}" data-action="toggle_frozen" data-user="${u.username}">
-          ${u.frozen ? "Unfreeze" : "Freeze"}
-        </button>
-        <button class="btn-sm btn-warning" data-action="purge_progress" data-user="${u.username}">
-          Remove Edits
-        </button>
-        <button class="btn-sm" data-action="toggle_admin" data-user="${u.username}">
-          ${u.admin ? "Remove Admin" : "Make Admin"}
-        </button>
-        <button class="btn-sm btn-danger" data-action="delete" data-user="${u.username}"
-          ${u.username === currentUsername ? "disabled title='Cannot delete your own account'" : ""}>
-          Delete
-        </button>
-      </div>
-    `;
-    list.appendChild(row);
-  });
-
-  list.querySelectorAll("button[data-action]").forEach(btn => {
-    if (btn.disabled) return;
-    btn.onclick = async () => {
-      const action = btn.dataset.action;
-      const username = btn.dataset.user;
-      const actionLabel = action === "purge_progress" ? "remove edits for" : action === "delete" ? "delete" : action === "toggle_frozen" ? "toggle freeze for" : "update";
-      if (action === "purge_progress" && !confirm(`Remove all collected progress and claims made by "${username}"? This cannot be undone.`)) return;
-      if (action === "delete" && !confirm(`Delete user "${username}" and remove all of their collected progress and claims? This cannot be undone.`)) return;
-      if (action === "toggle_frozen" && !confirm(`Toggle whether "${username}" can make contributions?`)) return;
-      setAdminStatus(`Working on ${actionLabel} ${username}...`, "info");
-      const res = await fetch("api/admin/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, action })
-      });
-      if (res.ok) {
-        if (action === "purge_progress") {
-          setAdminStatus(`Removed all edits and claims made by ${username}.`, "success");
-        } else if (action === "delete") {
-          setAdminStatus(`Deleted ${username} and removed their edits.`, "success");
-        } else if (action === "toggle_frozen") {
-          setAdminStatus(`Updated contribution access for ${username}.`, "success");
-        } else {
-          setAdminStatus(`Updated ${username}.`, "success");
-        }
-        loadAdminUsers();
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setAdminStatus(data.error || `Failed to ${actionLabel} ${username}.`, "error");
-      }
-    };
-  });
-}
-
-if (registrationLockBtn) {
-  registrationLockBtn.onclick = async () => {
-    const nextValue = !registrationLockedDown;
-    setAdminStatus(`${nextValue ? "Enabling" : "Disabling"} registration lockdown...`, "info");
-    const res = await fetch("api/admin/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ registration_locked_down: nextValue })
-    });
-    if (res.ok) {
-      registrationLockedDown = nextValue;
-      renderRegistrationLockState();
-      setAdminStatus(
-        nextValue
-          ? "Registration lockdown enabled. New accounts will be created frozen."
-          : "Registration lockdown disabled. New accounts can contribute immediately.",
-        "success"
-      );
-    } else {
-      const data = await res.json().catch(() => ({}));
-      setAdminStatus(data.error || "Failed to update registration lockdown.", "error");
+    stopStream();
+    if (!state.activeListId) {
+        return;
     }
-  };
+
+    state.eventSource = new EventSource(`events?list_id=${encodeURIComponent(state.activeListId)}`);
+    state.eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === "update" && data.list_id === state.activeListId) {
+            state.activeItems = data.items;
+            renderChecklist();
+        }
+    };
+    state.eventSource.onerror = () => stopStream();
+}
+
+function stopStream() {
+    if (state.eventSource) {
+        state.eventSource.close();
+        state.eventSource = null;
+    }
+}
+
+function renderOwnedLists() {
+    ownedListsEl.innerHTML = "";
+    const ownedLists = state.accessibleLists.filter((list) => list.can_manage);
+    if (ownedLists.length === 0) {
+        ownedListsEl.innerHTML = '<div class="empty-state compact">You do not own any lists yet.</div>';
+        return;
+    }
+
+    ownedLists.forEach((list) => {
+        ownedListsEl.appendChild(createListCard(list, {
+            onOpen: () => {
+                setActiveList(list.id);
+                setView("checklist");
+            },
+            onManage: async () => {
+                state.managedOwnerListId = list.id;
+                await loadManagedOwnerList();
+            },
+            onDelete: () => deleteList(list.id, false)
+        }));
+    });
+}
+
+function renderOwnerManageCard() {
+    if (!state.ownerManagedList) {
+        ownerManageCardEl.innerHTML = '<div class="empty-state compact">Select one of your lists to manage it.</div>';
+        return;
+    }
+    ownerManageCardEl.innerHTML = "";
+    ownerManageCardEl.appendChild(buildManagePanel(state.ownerManagedList, false));
+}
+
+function renderAdmin() {
+    renderAdminSettings();
+    renderAdminUsers();
+    renderAdminLists();
+    renderAdminManageCard();
+}
+
+function renderAdminSettings() {
+    registrationLockBtn.textContent = state.registrationLockedDown ? "Unlock Registration" : "Lock Registration";
+    registrationLockStateEl.textContent = state.registrationLockedDown
+        ? "New accounts are created frozen."
+        : "New accounts can contribute immediately.";
+}
+
+function renderAdminUsers() {
+    userListEl.innerHTML = "";
+    if (state.users.length === 0) {
+        userListEl.innerHTML = '<div class="empty-state compact">No users found.</div>';
+        return;
+    }
+
+    state.users.forEach((user) => {
+        const row = document.createElement("div");
+        row.className = "user-row";
+        row.innerHTML = `
+            <div class="user-summary">
+                <strong>${escapeHtml(user.username)}</strong>
+                <span class="pill subtle">${user.admin ? "admin" : "member"}</span>
+                ${user.frozen ? '<span class="pill warn">frozen</span>' : ""}
+            </div>
+            <div class="user-actions">
+                <button class="ghost-btn" data-action="toggle_frozen">${user.frozen ? "Unfreeze" : "Freeze"}</button>
+                <button class="ghost-btn" data-action="purge_progress">Remove Edits</button>
+                <button class="ghost-btn" data-action="toggle_admin">${user.admin ? "Remove Admin" : "Make Admin"}</button>
+                <button class="danger-btn" data-action="delete" ${user.username === state.currentUser ? "disabled" : ""}>Delete</button>
+            </div>
+        `;
+
+        row.querySelectorAll("button[data-action]").forEach((button) => {
+            button.onclick = async () => {
+                const action = button.dataset.action;
+                if (action === "delete" && !confirm(`Delete ${user.username} and remove owned lists and contributions?`)) {
+                    return;
+                }
+                if (action === "purge_progress" && !confirm(`Remove all contributions and claims by ${user.username}?`)) {
+                    return;
+                }
+                setAdminStatus(`Updating ${user.username}...`, "info");
+                const result = await api("api/admin/users", {
+                    method: "POST",
+                    body: { username: user.username, action }
+                });
+                if (!result.ok) {
+                    setAdminStatus(result.error || "Admin action failed.", "error");
+                    return;
+                }
+                setAdminStatus(`Updated ${user.username}.`, "success");
+                await refreshAllData();
+                await loadActiveListItems();
+            };
+        });
+
+        userListEl.appendChild(row);
+    });
+}
+
+function renderAdminLists() {
+    adminListsEl.innerHTML = "";
+    if (state.allLists.length === 0) {
+        adminListsEl.innerHTML = '<div class="empty-state compact">No lists found.</div>';
+        return;
+    }
+
+    state.allLists.forEach((list) => {
+        adminListsEl.appendChild(createListCard(list, {
+            onOpen: () => {
+                setActiveList(list.id);
+                setView("checklist");
+            },
+            onManage: async () => {
+                state.managedAdminListId = list.id;
+                await loadManagedAdminList();
+            },
+            onDelete: () => deleteList(list.id, true)
+        }));
+    });
+}
+
+function createListCard(list, actions) {
+    const card = document.createElement("article");
+    card.className = "list-card";
+    card.innerHTML = `
+        <div>
+            <div class="list-card-head">
+                <h3>${escapeHtml(list.name)}</h3>
+                <span class="pill">${escapeHtml(list.role)}</span>
+            </div>
+            <p class="muted">Owner: ${escapeHtml(list.owner_username)}</p>
+            <p class="muted">${list.item_count} items · ${list.collaborators.length} collaborators</p>
+        </div>
+        <div class="card-actions">
+            <button>Open</button>
+            <button class="ghost-btn">${list.can_manage || state.isAdmin ? "Manage" : "View"}</button>
+            <button class="danger-btn">Delete</button>
+        </div>
+    `;
+    const [openBtn, manageBtn, deleteBtn] = card.querySelectorAll("button");
+    openBtn.onclick = actions.onOpen;
+    manageBtn.onclick = actions.onManage;
+    deleteBtn.onclick = actions.onDelete;
+    if (!list.can_manage && !state.isAdmin) {
+        deleteBtn.style.display = "none";
+    }
+    return card;
+}
+
+function buildManagePanel(list, adminMode) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "manage-stack";
+    wrapper.innerHTML = `
+        <div class="manage-head">
+            <div>
+                <h3>${escapeHtml(list.name)}</h3>
+                <p class="muted">Owner: ${escapeHtml(list.owner_username)} · ${list.items.length} items</p>
+            </div>
+            <div class="pill">${escapeHtml(list.role)}</div>
+        </div>
+        <form class="inline-form" data-role="rename">
+            <input type="text" name="name" value="${escapeHtmlAttr(list.name)}">
+            <button type="submit">Rename List</button>
+        </form>
+        ${adminMode ? `
+        <form class="inline-form" data-role="transfer">
+            <input type="text" name="transfer_owner" placeholder="Transfer owner to username">
+            <button type="submit" class="ghost-btn">Transfer Ownership</button>
+        </form>` : ""}
+        <div class="manage-grid">
+            <section class="subpanel">
+                <div class="subpanel-head">
+                    <h4>Invite Codes</h4>
+                    <button class="ghost-btn" data-action="new-invite">Generate</button>
+                </div>
+                <div class="token-list" data-role="invites"></div>
+            </section>
+            <section class="subpanel">
+                <h4>Collaborators</h4>
+                <div class="token-list" data-role="members"></div>
+            </section>
+        </div>
+        <section class="subpanel">
+            <h4>Items</h4>
+            <form class="inline-form" data-role="item-create">
+                <input type="text" name="name" placeholder="Item name">
+                <input type="number" name="target" placeholder="Target" min="0">
+                <button type="submit">Add Item</button>
+            </form>
+            <div class="managed-items" data-role="items"></div>
+        </section>
+    `;
+
+    const renameForm = wrapper.querySelector('[data-role="rename"]');
+    renameForm.onsubmit = async (event) => {
+        event.preventDefault();
+        const name = renameForm.elements.name.value.trim();
+        const result = await api(`api/lists/${list.id}`, {
+            method: "PATCH",
+            body: { action: "rename", name }
+        });
+        await handleManageRefresh(result, adminMode, `Renamed "${name}".`);
+    };
+
+    if (adminMode) {
+        const transferForm = wrapper.querySelector('[data-role="transfer"]');
+        transferForm.onsubmit = async (event) => {
+            event.preventDefault();
+            const transferOwner = transferForm.elements.transfer_owner.value.trim();
+            const result = await api(`api/lists/${list.id}`, {
+                method: "PATCH",
+                body: { action: "transfer_owner", transfer_owner: transferOwner }
+            });
+            await handleManageRefresh(result, true, `Transferred ownership to ${transferOwner}.`);
+        };
+    }
+
+    wrapper.querySelector('[data-action="new-invite"]').onclick = async () => {
+        const result = await api(`api/lists/${list.id}/invites`, { method: "POST" });
+        await handleManageRefresh(result, adminMode, "Generated invite code.");
+    };
+
+    const invitesEl = wrapper.querySelector('[data-role="invites"]');
+    if (!list.invite_codes.length) {
+        invitesEl.innerHTML = '<p class="muted">No invite codes yet.</p>';
+    } else {
+        list.invite_codes.forEach((invite) => {
+            const row = document.createElement("div");
+            row.className = "token-row";
+            row.innerHTML = `
+                <code>${escapeHtml(invite.code)}</code>
+                <div class="token-actions">
+                    <button class="ghost-btn">Copy</button>
+                    <button class="danger-btn">Revoke</button>
+                </div>
+            `;
+            row.querySelector(".ghost-btn").onclick = async () => {
+                await navigator.clipboard.writeText(invite.code).catch(() => {});
+                setGlobalStatus("Invite code copied.", "success");
+            };
+            row.querySelector(".danger-btn").onclick = async () => {
+                const result = await api(`api/lists/${list.id}/invites`, {
+                    method: "DELETE",
+                    body: { code: invite.code }
+                });
+                await handleManageRefresh(result, adminMode, "Revoked invite code.");
+            };
+            invitesEl.appendChild(row);
+        });
+    }
+
+    const membersEl = wrapper.querySelector('[data-role="members"]');
+    if (!list.collaborators.length) {
+        membersEl.innerHTML = '<p class="muted">No collaborators yet.</p>';
+    } else {
+        list.collaborators.forEach((username) => {
+            const row = document.createElement("div");
+            row.className = "token-row";
+            row.innerHTML = `
+                <span>${escapeHtml(username)}</span>
+                <button class="danger-btn">Remove</button>
+            `;
+            row.querySelector("button").onclick = async () => {
+                const result = await api(`api/lists/${list.id}/members`, {
+                    method: "DELETE",
+                    body: { username }
+                });
+                await handleManageRefresh(result, adminMode, `Removed ${username}.`);
+            };
+            membersEl.appendChild(row);
+        });
+    }
+
+    const createItemForm = wrapper.querySelector('[data-role="item-create"]');
+    createItemForm.onsubmit = async (event) => {
+        event.preventDefault();
+        const name = createItemForm.elements.name.value.trim();
+        const target = Number(createItemForm.elements.target.value);
+        const result = await api(`api/lists/${list.id}/items`, {
+            method: "POST",
+            body: { name, target }
+        });
+        if (result.ok) {
+            createItemForm.reset();
+        }
+        await handleManageRefresh(result, adminMode, `Saved "${name}".`);
+    };
+
+    const itemsContainer = wrapper.querySelector('[data-role="items"]');
+    if (!list.items.length) {
+        itemsContainer.innerHTML = '<div class="empty-state compact">This list has no items yet.</div>';
+    } else {
+        list.items
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .forEach((item) => {
+                const row = document.createElement("form");
+                row.className = "managed-item-row";
+                row.innerHTML = `
+                    <input type="text" name="name" value="${escapeHtmlAttr(item.name)}">
+                    <input type="number" name="target" value="${item.target}" min="0">
+                    <button type="submit" class="ghost-btn">Save</button>
+                    <button type="button" class="danger-btn">Delete</button>
+                `;
+                row.onsubmit = async (event) => {
+                    event.preventDefault();
+                    const result = await api(`api/lists/${list.id}/items`, {
+                        method: "POST",
+                        body: {
+                            original_name: item.name,
+                            name: row.elements.name.value.trim(),
+                            target: Number(row.elements.target.value)
+                        }
+                    });
+                    await handleManageRefresh(result, adminMode, `Updated "${item.name}".`);
+                };
+                row.querySelector(".danger-btn").onclick = async () => {
+                    const result = await api(`api/lists/${list.id}/items`, {
+                        method: "DELETE",
+                        body: { name: item.name }
+                    });
+                    await handleManageRefresh(result, adminMode, `Deleted "${item.name}".`);
+                };
+                itemsContainer.appendChild(row);
+            });
+    }
+
+    return wrapper;
+}
+
+async function handleManageRefresh(result, adminMode, successMessage) {
+    if (!result.ok) {
+        if (adminMode) {
+            setAdminStatus(result.error || "Action failed.", "error");
+        } else {
+            setGlobalStatus(result.error || "Action failed.", "error");
+        }
+        return;
+    }
+    if (adminMode) {
+        setAdminStatus(successMessage, "success");
+    } else {
+        setGlobalStatus(successMessage, "success");
+    }
+    await refreshAllData();
+    await loadActiveListItems();
+}
+
+async function deleteList(listID, adminMode) {
+    const target = (adminMode ? state.allLists : state.accessibleLists).find((list) => list.id === listID);
+    if (!target) {
+        return;
+    }
+    if (!confirm(`Delete "${target.name}"?`)) {
+        return;
+    }
+    const result = await api(`api/lists/${listID}`, { method: "DELETE" });
+    if (!result.ok) {
+        if (adminMode) {
+            setAdminStatus(result.error || "Could not delete list.", "error");
+        } else {
+            setGlobalStatus(result.error || "Could not delete list.", "error");
+        }
+        return;
+    }
+    if (state.activeListId === listID) {
+        state.activeListId = "";
+        localStorage.removeItem("activeListId");
+        stopStream();
+    }
+    await refreshAllData();
+    await loadActiveListItems();
+}
+
+function setGlobalStatus(message, kind) {
+    globalStatusEl.textContent = message;
+    globalStatusEl.dataset.kind = kind || "info";
+}
+
+function setAdminStatus(message, kind) {
+    adminStatusEl.textContent = message;
+    adminStatusEl.dataset.kind = kind || "info";
+}
+
+function renderAdminManageCard() {
+    if (!state.isAdmin || !state.adminManagedList) {
+        adminManageCardEl.innerHTML = '<div class="empty-state compact">Select a list from the admin list grid to manage it.</div>';
+        return;
+    }
+    adminManageCardEl.innerHTML = "";
+    adminManageCardEl.appendChild(buildManagePanel(state.adminManagedList, true));
+}
+
+function fuzzyMatch(pattern, text) {
+    if (!pattern) {
+        return { matched: true, score: 0, indices: [] };
+    }
+
+    const query = pattern.toLowerCase();
+    const source = text.toLowerCase();
+    let qIndex = 0;
+    let score = 0;
+    let consecutive = 0;
+    const indices = [];
+
+    for (let i = 0; i < source.length && qIndex < query.length; i += 1) {
+        if (source[i] !== query[qIndex]) {
+            consecutive = 0;
+            continue;
+        }
+
+        indices.push(i);
+        score += 1;
+        if (i === 0 || [" ", "-", "_"].includes(source[i - 1])) {
+            score += 6;
+        }
+        if (indices.length > 1 && indices[indices.length - 1] === indices[indices.length - 2] + 1) {
+            consecutive += 1;
+            score += 4 + consecutive;
+        } else {
+            consecutive = 0;
+        }
+        qIndex += 1;
+    }
+
+    if (qIndex !== query.length) {
+        return { matched: false, score: -Infinity, indices: [] };
+    }
+
+    const gaps = indices.length > 1 ? indices[indices.length - 1] - indices[0] - indices.length + 1 : 0;
+    score -= gaps * 0.5;
+    score += (1 / (source.length + 1)) * 10;
+    return { matched: true, score, indices };
+}
+
+function highlightMatches(text, indices) {
+    const positions = new Set(indices);
+    return text
+        .split("")
+        .map((char, index) => positions.has(index) ? `<mark>${char}</mark>` : char)
+        .join("");
+}
+
+function escapeHtml(text) {
+    return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+}
+
+function escapeHtmlAttr(text) {
+    return escapeHtml(text);
 }
 
 authCheck();
-
-// Add shadow to sticky header when scrolling
-const headerRow = document.querySelector("#app > .row:first-child");
-if (headerRow) {
-  window.addEventListener("scroll", () => {
-    if (window.scrollY > 10) {
-      headerRow.classList.add("scrolled");
-    } else {
-      headerRow.classList.remove("scrolled");
-    }
-  });
-}

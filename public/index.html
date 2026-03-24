@@ -9,86 +9,145 @@
   <link rel="icon" type="image/png" sizes="128x128" href="favicon.png">
 </head>
 <body>
-  <div id="app">
-    <div class="row">
-      <h1 style="margin:0">Checklist</h1>
-      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-        <div class="toggle">
-          <label class="switch" for="claimToggle">
-            <input id="claimToggle" type="checkbox">
-            <span class="slider"></span>
-          </label>
-          <label id="claimLabel" for="claimToggle">Claim Mode</label>
-        </div>
-        <div class="toggle">
-          <label class="switch" for="completionToggle">
-            <input id="completionToggle" type="checkbox">
-            <span class="slider"></span>
-          </label>
-          <label id="completionLabel" for="completionToggle">Item Based</label>
-        </div>
-        <div class="sort-controls">
-          <select id="sortMode">
-            <option value="none">No Sort</option>
-            <option value="alphabetical">A-Z</option>
-            <option value="progress">Progress</option>
-            <option value="target">Target</option>
-          </select>
-          <button id="sortBtn">Sort</button>
-          <select id="finishedPriority">
-            <option value="neutral">Finished: Neutral</option>
-            <option value="first">Finished: First</option>
-            <option value="last">Finished: Last</option>
-          </select>
-        </div>
+  <div id="appShell">
+    <header class="shell-header">
+      <div>
+        <p class="eyebrow">Shared Project Tracking</p>
+        <h1>Item Lists</h1>
       </div>
-      <div id="userBar" style="display:none">
-        <span id="currentUser"></span>
-        <button id="logoutBtn">Logout</button>
+      <div id="sessionBar" class="session-bar" style="display:none">
+        <div class="session-meta">
+          <span id="currentUser"></span>
+          <span id="userStateBadge" class="pill subtle"></span>
+        </div>
+        <button id="logoutBtn" class="ghost-btn">Logout</button>
       </div>
-    </div>
-    <div class="search-container">
-      <input id="searchInput" type="text" placeholder="Search items... (fuzzy)" autocomplete="off">
-      <button id="clearSearch" style="display:none">✕</button>
-    </div>
-    <div id="login">
-      <div id="loginPanel">
+    </header>
+
+    <section id="authCard" class="panel auth-panel">
+      <div id="loginPanel" class="auth-stack">
+        <h2>Login</h2>
         <input id="loginUsername" type="text" placeholder="Username" autocomplete="username">
         <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password">
         <button id="loginBtn">Login</button>
-        <span id="loginMsg"></span>
-        <span class="auth-toggle">No account? <a href="#" id="showRegister">Register</a></span>
+        <p id="loginMsg" class="error-text"></p>
+        <p class="auth-toggle">No account? <a href="#" id="showRegister">Register</a></p>
       </div>
-      <div id="registerPanel" style="display:none">
+      <div id="registerPanel" class="auth-stack" style="display:none">
+        <h2>Create Account</h2>
         <input id="regUsername" type="text" placeholder="Username" autocomplete="username">
         <input id="regPassword" type="password" placeholder="Password" autocomplete="new-password">
         <button id="registerBtn">Register</button>
-        <span id="registerMsg"></span>
-        <span class="auth-toggle">Have an account? <a href="#" id="showLogin">Login</a></span>
+        <p id="registerMsg" class="error-text"></p>
+        <p class="auth-toggle">Have an account? <a href="#" id="showLogin">Login</a></p>
       </div>
-    </div>
-    <div id="items"></div>
-    <div id="adminPanel" style="display:none">
-      <div class="admin-header">
-        <div>
-          <h2>User Management</h2>
-          <p class="admin-help">Admins can remove edits, freeze accounts, and lock down new registrations so new accounts stay frozen until approved.</p>
+    </section>
+
+    <div id="appView" style="display:none">
+      <section class="panel hero-panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Workspace</p>
+          <h2 id="activeListTitle">No list selected</h2>
+          <p id="activeListMeta" class="muted">Create a list or join one with an invite code.</p>
         </div>
-        <div id="adminStatus" class="admin-status" aria-live="polite"></div>
-      </div>
-      <div class="admin-controls">
-        <button id="registrationLockBtn" class="btn-sm">Lock Registration</button>
-        <span id="registrationLockState" class="admin-lock-state"></span>
-      </div>
-      <div id="userList"></div>
-    </div>
-    <div id="completion-bar">
-      <div class="bar-container">
-        <div class="bar-fill"></div>
-      </div>
-      <div class="bar-label">0%</div>
+        <div class="hero-actions">
+          <div class="join-box">
+            <input id="inviteCodeInput" type="text" placeholder="Invite code">
+            <button id="joinListBtn">Join List</button>
+          </div>
+          <p id="globalStatus" class="status-text"></p>
+        </div>
+      </section>
+
+      <nav class="view-nav">
+        <button class="nav-btn active" data-view="checklist">Checklist</button>
+        <button class="nav-btn" data-view="lists">My Lists</button>
+        <button id="adminNavBtn" class="nav-btn" data-view="admin" style="display:none">Admin</button>
+      </nav>
+
+      <section id="view-checklist" class="view-section">
+        <div class="panel">
+          <div class="toolbar">
+            <div class="toggle-group">
+              <label class="switch-row">
+                <input id="claimToggle" type="checkbox">
+                <span>Claim Mode</span>
+              </label>
+              <label class="switch-row">
+                <input id="completionToggle" type="checkbox">
+                <span id="completionLabel">Panel Based</span>
+              </label>
+            </div>
+            <div class="sort-group">
+              <select id="sortMode">
+                <option value="none">No Sort</option>
+                <option value="alphabetical">A-Z</option>
+                <option value="progress">Progress</option>
+                <option value="target">Target</option>
+              </select>
+              <select id="finishedPriority">
+                <option value="neutral">Finished: Neutral</option>
+                <option value="first">Finished: First</option>
+                <option value="last">Finished: Last</option>
+              </select>
+            </div>
+          </div>
+          <div class="search-row">
+            <input id="searchInput" type="text" placeholder="Search items">
+            <button id="clearSearch" class="ghost-btn" style="display:none">Clear</button>
+          </div>
+          <div id="listChooser" class="list-chooser"></div>
+          <div id="emptyChecklist" class="empty-state">Select a list to start contributing.</div>
+          <div id="items"></div>
+        </div>
+        <div id="completion-bar">
+          <div class="bar-fill"></div>
+          <div class="bar-label">0%</div>
+        </div>
+      </section>
+
+      <section id="view-lists" class="view-section" style="display:none">
+        <div class="panel split-panel">
+          <div>
+            <h2>My Lists</h2>
+            <p class="muted">Create lists you own, open them in the checklist view, and manage collaborators with invite codes.</p>
+          </div>
+          <form id="createListForm" class="inline-form">
+            <input id="createListName" type="text" placeholder="New list name">
+            <button type="submit">Create List</button>
+          </form>
+        </div>
+        <div id="ownedLists" class="card-grid"></div>
+        <div id="ownerManageCard" class="panel"></div>
+      </section>
+
+      <section id="view-admin" class="view-section" style="display:none">
+        <div class="panel">
+          <div class="admin-head">
+            <div>
+              <h2>Admin Control</h2>
+              <p class="muted">Manage registrations, accounts, and every list in the system.</p>
+            </div>
+            <div id="adminStatus" class="status-box"></div>
+          </div>
+          <div class="inline-actions">
+            <button id="registrationLockBtn" class="ghost-btn">Lock Registration</button>
+            <span id="registrationLockState" class="muted"></span>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Users</h3>
+          <div id="userList"></div>
+        </div>
+        <div class="panel">
+          <h3>All Lists</h3>
+          <div id="adminLists" class="card-grid"></div>
+        </div>
+        <div id="adminManageCard" class="panel"></div>
+      </section>
     </div>
   </div>
+
   <script src="app.js" defer></script>
 </body>
 </html>

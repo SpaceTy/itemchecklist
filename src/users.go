@@ -51,42 +51,47 @@ func adminUsersHandler(b *sseBroker) http.HandlerFunc {
 			switch req.Action {
 			case "toggle_frozen":
 				users[idx].Frozen = !users[idx].Frozen
+
 			case "purge_progress":
-				items, err := readItems()
+				lists, err := readLists()
 				if err != nil {
 					http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
 					return
 				}
-				if revokeUserEdits(items, req.Username) {
-					if err := writeItems(items); err != nil {
+				changed := revokeUserEditsFromLists(lists, req.Username)
+				if changed {
+					if err := writeLists(lists); err != nil {
 						http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
 						return
 					}
-					broadcastItemsUpdate(b, items)
+					broadcastAllLists(b, lists)
 				}
 				writeJSON(w, map[string]bool{"success": true})
 				return
+
 			case "delete":
 				if users[idx].Username == callerUsername {
 					http.Error(w, `{"error":"Cannot delete your own account"}`, http.StatusBadRequest)
 					return
 				}
-				items, err := readItems()
+
+				lists, err := readLists()
 				if err != nil {
 					http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
 					return
 				}
-				itemsChanged := revokeUserEdits(items, req.Username)
-				users = append(users[:idx], users[idx+1:]...)
-				if itemsChanged {
-					if err := writeItems(items); err != nil {
-						http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
-						return
-					}
-					broadcastItemsUpdate(b, items)
+				revokeUserEditsFromLists(lists, req.Username)
+				lists, _ = deleteListsOwnedByUser(lists, req.Username)
+				if err := writeLists(lists); err != nil {
+					http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
+					return
 				}
+				broadcastAllLists(b, lists)
+				users = append(users[:idx], users[idx+1:]...)
+
 			case "toggle_admin":
 				users[idx].Admin = !users[idx].Admin
+
 			default:
 				http.Error(w, `{"error":"Unknown action"}`, http.StatusBadRequest)
 				return
@@ -111,6 +116,11 @@ func readUsers() ([]user, error) {
 	}
 	if err := readJSONFile(usersPath, &users); err != nil {
 		return nil, err
+	}
+	for i := range users {
+		if users[i].Username == "" {
+			continue
+		}
 	}
 	return users, nil
 }
@@ -141,6 +151,7 @@ func adminSettingsHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, settings)
+
 	case http.MethodPost:
 		var req adminSettingsRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -155,6 +166,7 @@ func adminSettingsHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, map[string]bool{"success": true})
+
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}

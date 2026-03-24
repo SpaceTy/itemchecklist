@@ -10,6 +10,7 @@ const (
 	usersPath    = "users.json"
 	settingsPath = "settings.json"
 	itemsPath    = "items.json"
+	listsPath    = "lists.json"
 	backupsDir   = "backups"
 	secretPath   = "secret.key"
 	tokenTTL     = 30 * 24 * time.Hour
@@ -28,9 +29,9 @@ func newServerMux(broker *sseBroker) *http.ServeMux {
 	register("/api/logout", logoutHandler)
 
 	register("/api/check-auth", requireAuth(checkAuthHandler))
-	register("/api/items", requireAuth(getItemsHandler))
-	register("/api/items/update", requireContributionAccess(updateItemHandler(broker)))
-	register("/api/items/claim", requireContributionAccess(claimItemHandler(broker)))
+	register("/api/lists", requireAuth(listsCollectionHandler))
+	register("/api/lists/join", requireAuth(joinListHandler))
+	register("/api/lists/", requireAuth(listResourceHandler(broker)))
 	register("/events", requireAuth(sseHandler(broker)))
 
 	register("/api/admin/users", requireAdmin(adminUsersHandler(broker)))

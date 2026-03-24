@@ -20,8 +20,8 @@ func scheduleBackups() {
 }
 
 func performBackup() {
-	items, err := readItems()
-	if err != nil || len(items) == 0 {
+	lists, err := readLists()
+	if err != nil || len(lists) == 0 {
 		return
 	}
 
@@ -31,10 +31,10 @@ func performBackup() {
 	}
 
 	timestamp := time.Now().UTC().Format("2006-01-02T15-04-05Z07-00")
-	filename := fmt.Sprintf("items-%s.json", timestamp)
+	filename := fmt.Sprintf("lists-%s.json", timestamp)
 	path := filepath.Join(backupsDir, filename)
 
-	if err := writeJSONFile(path, items); err != nil {
+	if err := writeJSONFile(path, lists); err != nil {
 		log.Printf("backup write error: %v", err)
 		return
 	}
@@ -54,19 +54,20 @@ func cleanupBackups() {
 	}
 
 	var backups []backupFile
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasPrefix(e.Name(), "items-") && strings.HasSuffix(e.Name(), ".json") {
-			timestampStr := strings.TrimPrefix(e.Name(), "items-")
-			timestampStr = strings.TrimSuffix(timestampStr, ".json")
-			timestampStr = strings.ReplaceAll(timestampStr, "-", ":")
-			timestampStr = strings.Replace(timestampStr, ":", "-", 2)
-			timestampStr = strings.Replace(timestampStr, ":", "-", 1)
-			t, err := time.Parse("2006-01-02T15-04-05Z07:00", timestampStr)
-			if err != nil {
-				continue
-			}
-			backups = append(backups, backupFile{name: e.Name(), time: t})
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasPrefix(entry.Name(), "lists-") || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
 		}
+		timestampStr := strings.TrimPrefix(entry.Name(), "lists-")
+		timestampStr = strings.TrimSuffix(timestampStr, ".json")
+		timestampStr = strings.ReplaceAll(timestampStr, "-", ":")
+		timestampStr = strings.Replace(timestampStr, ":", "-", 2)
+		timestampStr = strings.Replace(timestampStr, ":", "-", 1)
+		t, err := time.Parse("2006-01-02T15-04-05Z07:00", timestampStr)
+		if err != nil {
+			continue
+		}
+		backups = append(backups, backupFile{name: entry.Name(), time: t})
 	}
 
 	if len(backups) == 0 {
@@ -78,8 +79,7 @@ func cleanupBackups() {
 	})
 
 	now := time.Now()
-	toKeep := make(map[string]bool)
-	toKeep[backups[0].name] = true
+	toKeep := map[string]bool{backups[0].name: true}
 
 	var (
 		recent  = 2 * time.Hour
@@ -89,86 +89,86 @@ func cleanupBackups() {
 		monthly = 365 * 24 * time.Hour
 	)
 
-	for _, b := range backups {
-		if now.Sub(b.time) <= recent {
-			toKeep[b.name] = true
+	for _, backup := range backups {
+		if now.Sub(backup.time) <= recent {
+			toKeep[backup.name] = true
 		}
 	}
 
 	hourlyBuckets := make(map[string]backupFile)
-	for _, b := range backups {
-		age := now.Sub(b.time)
+	for _, backup := range backups {
+		age := now.Sub(backup.time)
 		if age > recent && age <= hourly {
-			bucket := b.time.Truncate(time.Hour).Format(time.RFC3339)
-			if existing, exists := hourlyBuckets[bucket]; !exists || b.time.After(existing.time) {
-				hourlyBuckets[bucket] = b
+			bucket := backup.time.Truncate(time.Hour).Format(time.RFC3339)
+			if existing, ok := hourlyBuckets[bucket]; !ok || backup.time.After(existing.time) {
+				hourlyBuckets[bucket] = backup
 			}
 		}
 	}
-	for _, b := range hourlyBuckets {
-		toKeep[b.name] = true
+	for _, backup := range hourlyBuckets {
+		toKeep[backup.name] = true
 	}
 
 	dailyBuckets := make(map[string]backupFile)
-	for _, b := range backups {
-		age := now.Sub(b.time)
+	for _, backup := range backups {
+		age := now.Sub(backup.time)
 		if age > hourly && age <= daily {
-			bucket := b.time.Truncate(24 * time.Hour).Format(time.RFC3339)
-			if existing, exists := dailyBuckets[bucket]; !exists || b.time.After(existing.time) {
-				dailyBuckets[bucket] = b
+			bucket := backup.time.Truncate(24 * time.Hour).Format(time.RFC3339)
+			if existing, ok := dailyBuckets[bucket]; !ok || backup.time.After(existing.time) {
+				dailyBuckets[bucket] = backup
 			}
 		}
 	}
-	for _, b := range dailyBuckets {
-		toKeep[b.name] = true
+	for _, backup := range dailyBuckets {
+		toKeep[backup.name] = true
 	}
 
 	weeklyBuckets := make(map[string]backupFile)
-	for _, b := range backups {
-		age := now.Sub(b.time)
+	for _, backup := range backups {
+		age := now.Sub(backup.time)
 		if age > daily && age <= weekly {
-			_, week := b.time.ISOWeek()
-			bucket := fmt.Sprintf("%d-W%d", b.time.Year(), week)
-			if existing, exists := weeklyBuckets[bucket]; !exists || b.time.After(existing.time) {
-				weeklyBuckets[bucket] = b
+			_, week := backup.time.ISOWeek()
+			bucket := fmt.Sprintf("%d-W%d", backup.time.Year(), week)
+			if existing, ok := weeklyBuckets[bucket]; !ok || backup.time.After(existing.time) {
+				weeklyBuckets[bucket] = backup
 			}
 		}
 	}
-	for _, b := range weeklyBuckets {
-		toKeep[b.name] = true
+	for _, backup := range weeklyBuckets {
+		toKeep[backup.name] = true
 	}
 
 	monthlyBuckets := make(map[string]backupFile)
-	for _, b := range backups {
-		age := now.Sub(b.time)
+	for _, backup := range backups {
+		age := now.Sub(backup.time)
 		if age > weekly && age <= monthly {
-			bucket := b.time.Format("2006-01")
-			if existing, exists := monthlyBuckets[bucket]; !exists || b.time.After(existing.time) {
-				monthlyBuckets[bucket] = b
+			bucket := backup.time.Format("2006-01")
+			if existing, ok := monthlyBuckets[bucket]; !ok || backup.time.After(existing.time) {
+				monthlyBuckets[bucket] = backup
 			}
 		}
 	}
-	for _, b := range monthlyBuckets {
-		toKeep[b.name] = true
+	for _, backup := range monthlyBuckets {
+		toKeep[backup.name] = true
 	}
 
 	yearlyBuckets := make(map[string]backupFile)
-	for _, b := range backups {
-		age := now.Sub(b.time)
+	for _, backup := range backups {
+		age := now.Sub(backup.time)
 		if age > monthly {
-			bucket := b.time.Format("2006")
-			if existing, exists := yearlyBuckets[bucket]; !exists || b.time.After(existing.time) {
-				yearlyBuckets[bucket] = b
+			bucket := backup.time.Format("2006")
+			if existing, ok := yearlyBuckets[bucket]; !ok || backup.time.After(existing.time) {
+				yearlyBuckets[bucket] = backup
 			}
 		}
 	}
-	for _, b := range yearlyBuckets {
-		toKeep[b.name] = true
+	for _, backup := range yearlyBuckets {
+		toKeep[backup.name] = true
 	}
 
-	for _, b := range backups {
-		if !toKeep[b.name] {
-			_ = os.Remove(filepath.Join(backupsDir, b.name))
+	for _, backup := range backups {
+		if !toKeep[backup.name] {
+			_ = os.Remove(filepath.Join(backupsDir, backup.name))
 		}
 	}
 }
