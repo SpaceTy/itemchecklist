@@ -16,7 +16,6 @@ const state = {
     claimMode: false,
     completionMode: false,
     searchQuery: "",
-    lastUpdate: {},
     eventSource: null,
     dragActive: false,
     pendingRender: null
@@ -430,7 +429,6 @@ async function loadActiveListItems() {
     }
 
     state.activeItems = result.data;
-    state.lastUpdate = {};
     renderHero();
     renderChecklist();
     startStream();
@@ -538,10 +536,7 @@ function sendSliderUpdate(item, value) {
         claimItem(item.name, claimed);
         return;
     }
-    if (state.lastUpdate[item.name] === value) return;
-    state.lastUpdate[item.name] = value;
-    const delta = value - item.gathered;
-    updateItem(item.name, value, delta);
+    updateItem(item.name, value);
 }
 
 function renderChecklist() {
@@ -696,10 +691,10 @@ function paintClaims(container, item) {
     });
 }
 
-async function updateItem(name, gathered, delta) {
+async function updateItem(name, gathered) {
     const result = await api(`api/lists/${state.activeListId}/items/update`, {
         method: "POST",
-        body: { name, gathered, delta }
+        body: { name, gathered }
     });
     if (!result.ok) {
         setGlobalStatus(result.error || "Could not update item.", "error");

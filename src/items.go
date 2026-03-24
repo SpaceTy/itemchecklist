@@ -803,37 +803,70 @@ func applyContributionDelta(it *item, username string, delta int) int {
 
 	normalizeItem(it)
 
-	own := 0
-	existing := getContributionByUsername(it, username)
-	if existing != nil {
-		own = existing.Amount
+	// Cap positive delta to remaining capacity.
+	if delta > 0 {
+		remaining := it.Target - it.Gathered
+		if remaining < 0 {
+			remaining = 0
+		}
+		if delta > remaining {
+			delta = remaining
+		}
 	}
 
-	if delta < 0 && -delta > own {
-		delta = -own
+	// Cap negative delta: cannot go below 0 gathered.
+	if delta < 0 && -delta > it.Gathered {
+		delta = -it.Gathered
 	}
 
-	remaining := it.Target - it.Gathered
-	if remaining < 0 {
-		remaining = 0
-	}
-	if delta > remaining {
-		delta = remaining
-	}
 	if delta == 0 {
 		return 0
 	}
 
-	newAmount := own + delta
-	if existing == nil {
-		it.Contributions = append(it.Contributions, contribution{
-			Username: username,
-			Amount:   newAmount,
-		})
-	} else if newAmount == 0 {
-		removeContributionByUsername(it, username)
+	if delta > 0 {
+		// Positive: attribute to requesting user.
+		existing := getContributionByUsername(it, username)
+		if existing == nil {
+			it.Contributions = append(it.Contributions, contribution{
+				Username: username,
+				Amount:   delta,
+			})
+		} else {
+			existing.Amount += delta
+		}
 	} else {
-		existing.Amount = newAmount
+		// Negative: reduce requesting user's contribution first, then others.
+		toReduce := -delta
+
+		// Reduce own contribution first.
+		existing := getContributionByUsername(it, username)
+		if existing != nil {
+			reduce := min(toReduce, existing.Amount)
+			existing.Amount -= reduce
+			toReduce -= reduce
+		}
+
+		// Reduce remaining from other contributors.
+		for i := range it.Contributions {
+			if toReduce <= 0 {
+				break
+			}
+			if it.Contributions[i].Username == username {
+				continue
+			}
+			reduce := min(toReduce, it.Contributions[i].Amount)
+			it.Contributions[i].Amount -= reduce
+			toReduce -= reduce
+		}
+
+		// Remove zeroed-out contributions.
+		var kept []contribution
+		for _, c := range it.Contributions {
+			if c.Amount > 0 {
+				kept = append(kept, c)
+			}
+		}
+		it.Contributions = kept
 	}
 
 	it.Gathered += delta

@@ -9,12 +9,12 @@
       {
         "name": "Wood",
         "target": 10,
-        "gathered": 10,
+        "gathered": 4,
         "claims": null,
         "contributions": [
           {
             "username": "_legacy",
-            "amount": 10
+            "amount": 4
           }
         ]
       },
@@ -38,6 +38,6 @@
       }
     ],
     "created_at": "2026-03-24T19:18:00Z",
-    "updated_at": "2026-03-24T19:44:36Z"
+    "updated_at": "2026-03-24T19:55:20Z"
   }
 ]
