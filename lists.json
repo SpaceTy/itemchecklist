@@ -1,12 +1,43 @@
 [
   {
-    "id": "list_3aa49aacd3e68c81",
-    "name": "1",
+    "id": "list_imported_checklist",
+    "name": "Imported Checklist",
     "owner_username": "SpaceTy",
     "collaborators": [],
     "invite_codes": [],
-    "items": [],
-    "created_at": "2026-03-24T19:07:48Z",
-    "updated_at": "2026-03-24T19:07:48Z"
+    "items": [
+      {
+        "name": "Wood",
+        "target": 10,
+        "gathered": 10,
+        "claims": null,
+        "contributions": [
+          {
+            "username": "_legacy",
+            "amount": 10
+          }
+        ]
+      },
+      {
+        "name": "Stone",
+        "target": 5,
+        "gathered": 1,
+        "claims": [
+          {
+            "claimer": "SpaceTy",
+            "claim_start": 2,
+            "claim_end": 3
+          }
+        ],
+        "contributions": [
+          {
+            "username": "SpaceTy",
+            "amount": 1
+          }
+        ]
+      }
+    ],
+    "created_at": "2026-03-24T19:18:00Z",
+    "updated_at": "2026-03-24T19:34:09Z"
   }
 ]

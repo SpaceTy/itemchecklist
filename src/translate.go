@@ -1,76 +1,84 @@
-//go:build translate
-
-package translate
+package main
 
 import (
-	"encoding/json"
+	"bufio"
+	"bytes"
 	"fmt"
-	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 )
 
-type Item struct {
-	Name     string  `json:"name"`
-	Target   int     `json:"target"`
-	Gathered int     `json:"gathered"`
-	Claims   *string `json:"claims"`
-}
+var (
+	litematicaTitlePattern = regexp.MustCompile(`Material List for schematic '([^']+)'`)
+	litematicaRowPattern   = regexp.MustCompile(`^\s*\|\s*(.+?)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|`)
+)
 
-func main() {
-	// Read the input file
-	data, err := os.ReadFile("material_list_2025-12-04_10.09.24.txt")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
-		os.Exit(1)
-	}
+func parseLitematicaList(data []byte, fallbackName string, honorAvailable bool) ([]item, string, error) {
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	items := []item{}
+	listName := strings.TrimSpace(strings.TrimSuffix(filepath.Base(fallbackName), filepath.Ext(fallbackName)))
 
-	lines := strings.Split(string(data), "\n")
-	var items []Item
+	for scanner.Scan() {
+		line := scanner.Text()
 
-	// Regex to match data rows in the table
-	// Format: | Item Name | Total | Missing | Available |
-	rowRegex := regexp.MustCompile(`^\s*\|\s*(.+?)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|`)
+		if match := litematicaTitlePattern.FindStringSubmatch(line); len(match) == 2 && listName == "" {
+			listName = strings.TrimSpace(match[1])
+		}
 
-	for _, line := range lines {
-		matches := rowRegex.FindStringSubmatch(line)
-		if matches != nil && len(matches) == 5 {
-			itemName := strings.TrimSpace(matches[1])
+		match := litematicaRowPattern.FindStringSubmatch(line)
+		if len(match) != 5 {
+			continue
+		}
 
-			// Skip header rows
-			if itemName == "Item" || itemName == "Material List for schematic 'Mountain - Fixed' (1 of 1 regions)" {
-				continue
+		itemName := strings.TrimSpace(match[1])
+		if itemName == "" || strings.EqualFold(itemName, "Item") {
+			continue
+		}
+
+		total, err := strconv.Atoi(match[2])
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid total for %q", itemName)
+		}
+		available, err := strconv.Atoi(match[4])
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid available value for %q", itemName)
+		}
+
+		gathered := 0
+		contributions := []contribution{}
+		if honorAvailable {
+			gathered = available
+			if gathered > total {
+				gathered = total
 			}
-
-			total, err1 := strconv.Atoi(matches[2])
-			available := 0
-
-			if err1 == nil && err2 == nil {
-				item := Item{
-					Name:     itemName,
-					Target:   total,
-					Gathered: available,
-					Claims:   nil,
-				}
-				items = append(items, item)
+			if gathered > 0 {
+				contributions = []contribution{{
+					Username: legacyContributionUser,
+					Amount:   gathered,
+				}}
 			}
 		}
+
+		items = append(items, item{
+			Name:          itemName,
+			Target:        total,
+			Gathered:      gathered,
+			Claims:        []claim{},
+			Contributions: contributions,
+		})
 	}
 
-	// Marshal to JSON with indentation
-	jsonData, err := json.MarshalIndent(items, "", "  ")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error marshaling JSON: %v\n", err)
-		os.Exit(1)
+	if err := scanner.Err(); err != nil {
+		return nil, "", err
+	}
+	if len(items) == 0 {
+		return nil, "", fmt.Errorf("no litematica rows found in uploaded file")
+	}
+	if listName == "" {
+		listName = "Imported Litematica List"
 	}
 
-	// Write to items.json
-	err = os.WriteFile("items.json", jsonData, 0644)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Successfully converted %d items to items.json\n", len(items))
+	return items, listName, nil
 }

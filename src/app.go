@@ -30,6 +30,7 @@ func newServerMux(broker *sseBroker) *http.ServeMux {
 
 	register("/api/check-auth", requireAuth(checkAuthHandler))
 	register("/api/lists", requireAuth(listsCollectionHandler))
+	register("/api/lists/import", requireAuth(importListHandler))
 	register("/api/lists/join", requireAuth(joinListHandler))
 	register("/api/lists/", requireAuth(listResourceHandler(broker)))
 	register("/events", requireAuth(sseHandler(broker)))

@@ -32,7 +32,7 @@ const inviteCodeInput = document.getElementById("inviteCodeInput");
 const joinListBtn = document.getElementById("joinListBtn");
 const itemsEl = document.getElementById("items");
 const emptyChecklistEl = document.getElementById("emptyChecklist");
-const listChooserEl = document.getElementById("listChooser");
+const listSelectorEl = document.getElementById("listSelector");
 const claimToggle = document.getElementById("claimToggle");
 const completionToggle = document.getElementById("completionToggle");
 const completionLabel = document.getElementById("completionLabel");
@@ -41,7 +41,10 @@ const searchInput = document.getElementById("searchInput");
 const clearSearchBtn = document.getElementById("clearSearch");
 const sortModeEl = document.getElementById("sortMode");
 const finishedPriorityEl = document.getElementById("finishedPriority");
-const ownedListsEl = document.getElementById("ownedLists");
+const listMenuWrap = document.getElementById("listMenuWrap");
+const listMenuBtn = document.getElementById("listMenuBtn");
+const listMenuDropdown = document.getElementById("listMenuDropdown");
+const listMenuItemsEl = document.getElementById("listMenuItems");
 const ownerManageCardEl = document.getElementById("ownerManageCard");
 const adminManageCardEl = document.getElementById("adminManageCard");
 const adminListsEl = document.getElementById("adminLists");
@@ -103,19 +106,32 @@ document.getElementById("logoutBtn").onclick = async () => {
     await authCheck();
 };
 
-document.getElementById("createListForm").onsubmit = async (event) => {
+document.getElementById("importListForm").onsubmit = async (event) => {
     event.preventDefault();
-    const input = document.getElementById("createListName");
-    const result = await api("api/lists", {
-        method: "POST",
-        body: { name: input.value.trim() }
-    });
-    if (!result.ok) {
-        setGlobalStatus(result.error || "Could not create list", "error");
+    const nameInput = document.getElementById("createListName");
+    const fileInput = document.getElementById("litematicaFile");
+    const honorAvailable = document.getElementById("honorAvailable").checked;
+    const file = fileInput.files[0];
+
+    if (!file) {
+        setGlobalStatus("Choose a Litematica material list file first.", "error");
         return;
     }
-    input.value = "";
-    setGlobalStatus(`Created "${result.data.list.name}".`, "success");
+
+    const formData = new FormData();
+    formData.set("file", file);
+    formData.set("name", nameInput.value.trim());
+    formData.set("honor_available", String(honorAvailable));
+
+    const result = await apiMultipart("api/lists/import", formData);
+    if (!result.ok) {
+        setGlobalStatus(result.error || "Could not import list", "error");
+        return;
+    }
+    nameInput.value = "";
+    fileInput.value = "";
+    document.getElementById("honorAvailable").checked = false;
+    setGlobalStatus(`Imported "${result.data.list.name}".`, "success");
     await refreshAllData();
     setActiveList(result.data.list.id);
     state.managedOwnerListId = result.data.list.id;
@@ -193,6 +209,56 @@ document.querySelectorAll(".nav-btn").forEach((button) => {
     button.onclick = () => setView(button.dataset.view);
 });
 
+listMenuBtn.onclick = (event) => {
+    event.stopPropagation();
+    const isOpen = listMenuDropdown.style.display !== "none";
+    listMenuDropdown.style.display = isOpen ? "none" : "block";
+};
+
+document.addEventListener("click", (event) => {
+    if (!listMenuWrap.contains(event.target)) {
+        listMenuDropdown.style.display = "none";
+    }
+});
+
+let addItemModalListId = "";
+let addItemModalAdminMode = false;
+
+function openAddItemModal(listId, adminMode) {
+    addItemModalListId = listId;
+    addItemModalAdminMode = adminMode;
+    const modal = document.getElementById("addItemModal");
+    modal.style.display = "flex";
+    const form = document.getElementById("addItemForm");
+    form.elements.name.value = "";
+    form.elements.target.value = "";
+    form.elements.name.focus();
+}
+
+function closeAddItemModal() {
+    document.getElementById("addItemModal").style.display = "none";
+}
+
+document.getElementById("closeAddItemModal").onclick = closeAddItemModal;
+document.getElementById("addItemModal").onclick = (event) => {
+    if (event.target.id === "addItemModal") closeAddItemModal();
+};
+
+document.getElementById("addItemForm").onsubmit = async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    const name = form.elements.name.value.trim();
+    const target = Number(form.elements.target.value);
+    const result = await api(`api/lists/${addItemModalListId}/items`, {
+        method: "POST",
+        body: { name, target }
+    });
+    if (result.ok) {
+        closeAddItemModal();
+    }
+    await handleManageRefresh(result, addItemModalAdminMode, `Saved "${name}".`);
+};
+
 function api(path, options = {}) {
     const fetchOptions = { method: options.method || "GET", headers: {} };
     if (options.body !== undefined) {
@@ -200,6 +266,21 @@ function api(path, options = {}) {
         fetchOptions.body = JSON.stringify(options.body);
     }
     return fetch(path, fetchOptions)
+        .then(async (response) => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                return { ok: false, status: response.status, error: data.error || "Request failed" };
+            }
+            return { ok: true, status: response.status, data };
+        })
+        .catch(() => ({ ok: false, status: 0, error: "Network error" }));
+}
+
+function apiMultipart(path, formData) {
+    return fetch(path, {
+        method: "POST",
+        body: formData
+    })
         .then(async (response) => {
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
@@ -227,6 +308,7 @@ async function authCheck() {
     authCard.style.display = "none";
     appView.style.display = "block";
     sessionBar.style.display = "flex";
+    listMenuWrap.style.display = "block";
     adminNavBtn.style.display = state.isAdmin ? "inline-flex" : "none";
 
     renderSession();
@@ -282,7 +364,7 @@ async function refreshAllData() {
     }
 
     renderHero();
-    renderListChooser();
+    renderListMenu();
     renderOwnedLists();
     await loadManagedOwnerList();
     if (state.isAdmin) {
@@ -384,19 +466,26 @@ function renderHero() {
     activeListMetaEl.textContent = `${state.activeList.owner_username} · ${state.activeList.role} · ${state.activeList.item_count} items`;
 }
 
-function renderListChooser() {
-    listChooserEl.innerHTML = "";
+function renderListMenu() {
+    listMenuItemsEl.innerHTML = "";
     if (state.accessibleLists.length === 0) {
-        listChooserEl.innerHTML = '<p class="muted">You do not have access to any lists yet.</p>';
+        listMenuItemsEl.innerHTML = '<p class="muted" style="padding:12px">No lists available.</p>';
         return;
     }
 
     state.accessibleLists.forEach((list) => {
-        const button = document.createElement("button");
-        button.className = `chooser-pill ${list.id === state.activeListId ? "active" : ""}`;
-        button.textContent = `${list.name} (${list.role})`;
-        button.onclick = () => setActiveList(list.id);
-        listChooserEl.appendChild(button);
+        const item = document.createElement("button");
+        item.className = `list-menu-item ${list.id === state.activeListId ? "active" : ""}`;
+        item.innerHTML = `
+            <span class="list-menu-name">${escapeHtml(list.name)}</span>
+            <span class="list-menu-author">by ${escapeHtml(list.owner_username)}</span>
+        `;
+        item.onclick = () => {
+            setActiveList(list.id);
+            setView("checklist");
+            listMenuDropdown.style.display = "none";
+        };
+        listMenuItemsEl.appendChild(item);
     });
 }
 
@@ -598,35 +687,37 @@ function stopStream() {
 }
 
 function renderOwnedLists() {
-    ownedListsEl.innerHTML = "";
+    listSelectorEl.innerHTML = "";
     const ownedLists = state.accessibleLists.filter((list) => list.can_manage);
     if (ownedLists.length === 0) {
-        ownedListsEl.innerHTML = '<div class="empty-state compact">You do not own any lists yet.</div>';
+        listSelectorEl.innerHTML = '<div class="empty-state compact">You do not own any lists yet.</div>';
         return;
     }
 
     ownedLists.forEach((list) => {
-        ownedListsEl.appendChild(createListCard(list, {
-            onOpen: () => {
-                setActiveList(list.id);
-                setView("checklist");
-            },
-            onManage: async () => {
-                state.managedOwnerListId = list.id;
-                await loadManagedOwnerList();
-            },
-            onDelete: () => deleteList(list.id, false)
-        }));
+        const btn = document.createElement("button");
+        btn.className = `chooser-pill ${list.id === state.managedOwnerListId ? "active" : ""}`;
+        btn.textContent = list.name;
+        btn.onclick = async () => {
+            state.managedOwnerListId = list.id;
+            await loadManagedOwnerList();
+            renderOwnedLists();
+        };
+        listSelectorEl.appendChild(btn);
     });
 }
 
 function renderOwnerManageCard() {
     if (!state.ownerManagedList) {
-        ownerManageCardEl.innerHTML = '<div class="empty-state compact">Select one of your lists to manage it.</div>';
+        ownerManageCardEl.innerHTML = '<div class="empty-state compact" style="margin-bottom:18px">Select one of your lists to manage it.</div>';
         return;
     }
     ownerManageCardEl.innerHTML = "";
-    ownerManageCardEl.appendChild(buildManagePanel(state.ownerManagedList, false));
+    const panel = document.createElement("div");
+    panel.className = "panel";
+    panel.style.marginBottom = "18px";
+    panel.appendChild(buildManagePanel(state.ownerManagedList, false));
+    ownerManageCardEl.appendChild(panel);
 }
 
 function renderAdmin() {
@@ -748,60 +839,74 @@ function createListCard(list, actions) {
 function buildManagePanel(list, adminMode) {
     const wrapper = document.createElement("div");
     wrapper.className = "manage-stack";
-    wrapper.innerHTML = `
-        <div class="manage-head">
-            <div>
-                <h3>${escapeHtml(list.name)}</h3>
-                <p class="muted">Owner: ${escapeHtml(list.owner_username)} · ${list.items.length} items</p>
+
+    /* ── Header: name shown once, editable via button ── */
+    const header = document.createElement("div");
+    header.className = "manage-head";
+    header.innerHTML = `
+        <div class="editable-name-group">
+            <h3 class="editable-name-display">${escapeHtml(list.name)}</h3>
+            <button class="ghost-btn edit-name-btn" title="Rename list">&#9998;</button>
+            <div class="editable-name-form" style="display:none">
+                <input type="text" value="${escapeHtmlAttr(list.name)}" class="name-input">
+                <button type="button" class="ghost-btn save-name-btn">Save</button>
+                <button type="button" class="ghost-btn cancel-name-btn">Cancel</button>
             </div>
-            <div class="pill">${escapeHtml(list.role)}</div>
         </div>
-        <form class="inline-form" data-role="rename">
-            <input type="text" name="name" value="${escapeHtmlAttr(list.name)}">
-            <button type="submit">Rename List</button>
-        </form>
-        ${adminMode ? `
-        <form class="inline-form" data-role="transfer">
-            <input type="text" name="transfer_owner" placeholder="Transfer owner to username">
-            <button type="submit" class="ghost-btn">Transfer Ownership</button>
-        </form>` : ""}
-        <div class="manage-grid">
-            <section class="subpanel">
-                <div class="subpanel-head">
-                    <h4>Invite Codes</h4>
-                    <button class="ghost-btn" data-action="new-invite">Generate</button>
-                </div>
-                <div class="token-list" data-role="invites"></div>
-            </section>
-            <section class="subpanel">
-                <h4>Collaborators</h4>
-                <div class="token-list" data-role="members"></div>
-            </section>
+        <div class="manage-meta">
+            <p class="muted" style="margin:0">Owner: ${escapeHtml(list.owner_username)} &middot; ${list.items.length} items</p>
+            <div class="manage-actions">
+                <span class="pill">${escapeHtml(list.role)}</span>
+                <button class="ghost-btn open-list-btn">Open</button>
+                <button class="danger-btn delete-list-btn">Delete</button>
+            </div>
         </div>
-        <section class="subpanel">
-            <h4>Items</h4>
-            <form class="inline-form" data-role="item-create">
-                <input type="text" name="name" placeholder="Item name">
-                <input type="number" name="target" placeholder="Target" min="0">
-                <button type="submit">Add Item</button>
-            </form>
-            <div class="managed-items" data-role="items"></div>
-        </section>
     `;
 
-    const renameForm = wrapper.querySelector('[data-role="rename"]');
-    renameForm.onsubmit = async (event) => {
-        event.preventDefault();
-        const name = renameForm.elements.name.value.trim();
+    const nameDisplay = header.querySelector(".editable-name-display");
+    const editBtn = header.querySelector(".edit-name-btn");
+    const nameForm = header.querySelector(".editable-name-form");
+    const nameInput = header.querySelector(".name-input");
+
+    editBtn.onclick = () => {
+        nameDisplay.style.display = "none";
+        editBtn.style.display = "none";
+        nameForm.style.display = "flex";
+        nameInput.focus();
+        nameInput.select();
+    };
+    header.querySelector(".cancel-name-btn").onclick = () => {
+        nameDisplay.style.display = "";
+        editBtn.style.display = "";
+        nameForm.style.display = "none";
+        nameInput.value = list.name;
+    };
+    header.querySelector(".save-name-btn").onclick = async () => {
+        const name = nameInput.value.trim();
+        if (!name) return;
         const result = await api(`api/lists/${list.id}`, {
             method: "PATCH",
             body: { action: "rename", name }
         });
-        await handleManageRefresh(result, adminMode, `Renamed "${name}".`);
+        await handleManageRefresh(result, adminMode, `Renamed to "${name}".`);
     };
 
+    header.querySelector(".open-list-btn").onclick = () => {
+        setActiveList(list.id);
+        setView("checklist");
+    };
+    header.querySelector(".delete-list-btn").onclick = () => deleteList(list.id, adminMode);
+
+    wrapper.appendChild(header);
+
+    /* ── Transfer ownership (admin only) ── */
     if (adminMode) {
-        const transferForm = wrapper.querySelector('[data-role="transfer"]');
+        const transferForm = document.createElement("form");
+        transferForm.className = "inline-form";
+        transferForm.innerHTML = `
+            <input type="text" name="transfer_owner" placeholder="Transfer owner to username">
+            <button type="submit" class="ghost-btn">Transfer Ownership</button>
+        `;
         transferForm.onsubmit = async (event) => {
             event.preventDefault();
             const transferOwner = transferForm.elements.transfer_owner.value.trim();
@@ -811,80 +916,25 @@ function buildManagePanel(list, adminMode) {
             });
             await handleManageRefresh(result, true, `Transferred ownership to ${transferOwner}.`);
         };
+        wrapper.appendChild(transferForm);
     }
 
-    wrapper.querySelector('[data-action="new-invite"]').onclick = async () => {
-        const result = await api(`api/lists/${list.id}/invites`, { method: "POST" });
-        await handleManageRefresh(result, adminMode, "Generated invite code.");
+    /* ── Items section (add item via modal) ── */
+    const itemsSection = document.createElement("section");
+    itemsSection.className = "subpanel";
+    itemsSection.innerHTML = `
+        <div class="subpanel-head">
+            <h4>Items</h4>
+            <button class="ghost-btn add-item-trigger">+ Add Item</button>
+        </div>
+        <div class="managed-items" data-role="items"></div>
+    `;
+
+    itemsSection.querySelector(".add-item-trigger").onclick = () => {
+        openAddItemModal(list.id, adminMode);
     };
 
-    const invitesEl = wrapper.querySelector('[data-role="invites"]');
-    if (!list.invite_codes.length) {
-        invitesEl.innerHTML = '<p class="muted">No invite codes yet.</p>';
-    } else {
-        list.invite_codes.forEach((invite) => {
-            const row = document.createElement("div");
-            row.className = "token-row";
-            row.innerHTML = `
-                <code>${escapeHtml(invite.code)}</code>
-                <div class="token-actions">
-                    <button class="ghost-btn">Copy</button>
-                    <button class="danger-btn">Revoke</button>
-                </div>
-            `;
-            row.querySelector(".ghost-btn").onclick = async () => {
-                await navigator.clipboard.writeText(invite.code).catch(() => {});
-                setGlobalStatus("Invite code copied.", "success");
-            };
-            row.querySelector(".danger-btn").onclick = async () => {
-                const result = await api(`api/lists/${list.id}/invites`, {
-                    method: "DELETE",
-                    body: { code: invite.code }
-                });
-                await handleManageRefresh(result, adminMode, "Revoked invite code.");
-            };
-            invitesEl.appendChild(row);
-        });
-    }
-
-    const membersEl = wrapper.querySelector('[data-role="members"]');
-    if (!list.collaborators.length) {
-        membersEl.innerHTML = '<p class="muted">No collaborators yet.</p>';
-    } else {
-        list.collaborators.forEach((username) => {
-            const row = document.createElement("div");
-            row.className = "token-row";
-            row.innerHTML = `
-                <span>${escapeHtml(username)}</span>
-                <button class="danger-btn">Remove</button>
-            `;
-            row.querySelector("button").onclick = async () => {
-                const result = await api(`api/lists/${list.id}/members`, {
-                    method: "DELETE",
-                    body: { username }
-                });
-                await handleManageRefresh(result, adminMode, `Removed ${username}.`);
-            };
-            membersEl.appendChild(row);
-        });
-    }
-
-    const createItemForm = wrapper.querySelector('[data-role="item-create"]');
-    createItemForm.onsubmit = async (event) => {
-        event.preventDefault();
-        const name = createItemForm.elements.name.value.trim();
-        const target = Number(createItemForm.elements.target.value);
-        const result = await api(`api/lists/${list.id}/items`, {
-            method: "POST",
-            body: { name, target }
-        });
-        if (result.ok) {
-            createItemForm.reset();
-        }
-        await handleManageRefresh(result, adminMode, `Saved "${name}".`);
-    };
-
-    const itemsContainer = wrapper.querySelector('[data-role="items"]');
+    const itemsContainer = itemsSection.querySelector('[data-role="items"]');
     if (!list.items.length) {
         itemsContainer.innerHTML = '<div class="empty-state compact">This list has no items yet.</div>';
     } else {
@@ -922,6 +972,92 @@ function buildManagePanel(list, adminMode) {
                 itemsContainer.appendChild(row);
             });
     }
+    wrapper.appendChild(itemsSection);
+
+    /* ── Collaborators section (at bottom, single panel) ── */
+    const collabSection = document.createElement("section");
+    collabSection.className = "subpanel";
+    collabSection.innerHTML = `
+        <div class="subpanel-head">
+            <h4>Collaborators</h4>
+            <button class="ghost-btn" data-action="new-invite">Generate Invite Code</button>
+        </div>
+        <div class="collab-content">
+            <div data-role="invites"></div>
+            <div data-role="members"></div>
+        </div>
+    `;
+
+    collabSection.querySelector('[data-action="new-invite"]').onclick = async () => {
+        const result = await api(`api/lists/${list.id}/invites`, { method: "POST" });
+        await handleManageRefresh(result, adminMode, "Generated invite code.");
+    };
+
+    const invitesEl = collabSection.querySelector('[data-role="invites"]');
+    if (list.invite_codes.length) {
+        const inviteLabel = document.createElement("p");
+        inviteLabel.className = "muted";
+        inviteLabel.style.margin = "12px 0 6px";
+        inviteLabel.textContent = "Invite Codes";
+        invitesEl.appendChild(inviteLabel);
+
+        list.invite_codes.forEach((invite) => {
+            const row = document.createElement("div");
+            row.className = "token-row";
+            row.innerHTML = `
+                <code>${escapeHtml(invite.code)}</code>
+                <div class="token-actions">
+                    <button class="ghost-btn">Copy</button>
+                    <button class="danger-btn">Revoke</button>
+                </div>
+            `;
+            row.querySelector(".ghost-btn").onclick = async () => {
+                await navigator.clipboard.writeText(invite.code).catch(() => {});
+                setGlobalStatus("Invite code copied.", "success");
+            };
+            row.querySelector(".danger-btn").onclick = async () => {
+                const result = await api(`api/lists/${list.id}/invites`, {
+                    method: "DELETE",
+                    body: { code: invite.code }
+                });
+                await handleManageRefresh(result, adminMode, "Revoked invite code.");
+            };
+            invitesEl.appendChild(row);
+        });
+    }
+
+    const membersEl = collabSection.querySelector('[data-role="members"]');
+    if (list.collaborators.length) {
+        const memberLabel = document.createElement("p");
+        memberLabel.className = "muted";
+        memberLabel.style.margin = "12px 0 6px";
+        memberLabel.textContent = "Members";
+        membersEl.appendChild(memberLabel);
+
+        list.collaborators.forEach((username) => {
+            const row = document.createElement("div");
+            row.className = "token-row";
+            row.innerHTML = `
+                <span>${escapeHtml(username)}</span>
+                <button class="danger-btn">Remove</button>
+            `;
+            row.querySelector("button").onclick = async () => {
+                const result = await api(`api/lists/${list.id}/members`, {
+                    method: "DELETE",
+                    body: { username }
+                });
+                await handleManageRefresh(result, adminMode, `Removed ${username}.`);
+            };
+            membersEl.appendChild(row);
+        });
+    }
+
+    if (!list.invite_codes.length && !list.collaborators.length) {
+        collabSection.querySelector(".collab-content").innerHTML =
+            '<p class="muted">No collaborators or invite codes yet. Generate an invite code to share this list.</p>';
+    }
+
+    wrapper.appendChild(collabSection);
 
     return wrapper;
 }

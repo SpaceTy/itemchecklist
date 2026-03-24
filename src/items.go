@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"slices"
@@ -45,49 +46,84 @@ func listsCollectionHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, summaries)
 
-	case http.MethodPost:
-		var req createListRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, `{"error":"Invalid body"}`, http.StatusBadRequest)
-			return
-		}
-
-		req.Name = strings.TrimSpace(req.Name)
-		if req.Name == "" {
-			http.Error(w, `{"error":"List name is required"}`, http.StatusBadRequest)
-			return
-		}
-
-		lists, err := readLists()
-		if err != nil {
-			http.Error(w, `{"error":"Could not read lists"}`, http.StatusInternalServerError)
-			return
-		}
-
-		newList := itemList{
-			ID:            newID("list"),
-			Name:          req.Name,
-			OwnerUsername: username,
-			Collaborators: []string{},
-			InviteCodes:   []inviteCode{},
-			Items:         []item{},
-			CreatedAt:     nowRFC3339(),
-			UpdatedAt:     nowRFC3339(),
-		}
-		lists = append(lists, newList)
-		if err := writeLists(lists); err != nil {
-			http.Error(w, `{"error":"Could not create list"}`, http.StatusInternalServerError)
-			return
-		}
-
-		writeJSON(w, map[string]any{
-			"success": true,
-			"list":    makeListSummary(newList, username, user.Admin),
-		})
-
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func importListHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	username := r.Context().Value(usernameKey).(string)
+	user, err := findUser(username)
+	if err != nil || user == nil {
+		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, `{"error":"Invalid upload"}`, http.StatusBadRequest)
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, `{"error":"Upload a litematica material list file"}`, http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		http.Error(w, `{"error":"Could not read uploaded file"}`, http.StatusInternalServerError)
+		return
+	}
+
+	honorAvailable := strings.EqualFold(r.FormValue("honor_available"), "true") ||
+		strings.EqualFold(r.FormValue("honor_available"), "on") ||
+		r.FormValue("honor_available") == "1"
+
+	items, parsedName, err := parseLitematicaList(data, header.Filename, honorAvailable)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+		return
+	}
+
+	listName := strings.TrimSpace(r.FormValue("name"))
+	if listName == "" {
+		listName = parsedName
+	}
+
+	lists, err := readLists()
+	if err != nil {
+		http.Error(w, `{"error":"Could not read lists"}`, http.StatusInternalServerError)
+		return
+	}
+
+	newList := itemList{
+		ID:            newID("list"),
+		Name:          listName,
+		OwnerUsername: username,
+		Collaborators: []string{},
+		InviteCodes:   []inviteCode{},
+		Items:         items,
+		CreatedAt:     nowRFC3339(),
+		UpdatedAt:     nowRFC3339(),
+	}
+
+	lists = append(lists, newList)
+	if err := writeLists(lists); err != nil {
+		http.Error(w, `{"error":"Could not create list"}`, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]any{
+		"success": true,
+		"list":    makeListSummary(newList, username, user.Admin),
+	})
 }
 
 func joinListHandler(w http.ResponseWriter, r *http.Request) {
