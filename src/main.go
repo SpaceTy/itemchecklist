@@ -23,6 +23,13 @@ func main() {
 		log.Printf("Created empty %s", usersPath)
 	}
 
+	if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
+		if err := writeJSONFile(settingsPath, appSettings{}); err != nil {
+			log.Fatalf("creating settings file: %v", err)
+		}
+		log.Printf("Created default %s", settingsPath)
+	}
+
 	broker := newSSEBroker()
 	go scheduleBackups()
 

@@ -10,6 +10,9 @@ const sortModeEl = document.getElementById("sortMode");
 const finishedPriorityEl = document.getElementById("finishedPriority");
 const searchInput = document.getElementById("searchInput");
 const clearSearchBtn = document.getElementById("clearSearch");
+const adminStatusEl = document.getElementById("adminStatus");
+const registrationLockBtn = document.getElementById("registrationLockBtn");
+const registrationLockStateEl = document.getElementById("registrationLockState");
 let claimMode = false;
 let completionMode = false; // false = panel based, true = item based
 let lastUpdate = {};
@@ -20,7 +23,40 @@ let searchQuery = "";
 let allItems = [];
 let currentUsername = null;
 let isAdmin = false;
+let isFrozen = false;
 let eventSource = null;
+let registrationLockedDown = false;
+
+function setAdminStatus(message, kind = "info") {
+  if (!adminStatusEl) return;
+  adminStatusEl.textContent = message;
+  adminStatusEl.className = `admin-status ${kind}`;
+}
+
+function setContributionAvailability() {
+  claimBtn.disabled = isFrozen;
+  completionToggle.disabled = false;
+  if (isFrozen) {
+    claimMode = false;
+    claimBtn.checked = false;
+    document.body.classList.remove("claim-mode");
+    claimLabel.textContent = "Frozen";
+    document.getElementById("currentUser").textContent = `${currentUsername} (frozen)`;
+  } else {
+    claimLabel.textContent = "Claim Mode";
+    document.getElementById("currentUser").textContent = currentUsername || "";
+  }
+}
+
+function renderRegistrationLockState() {
+  if (!registrationLockBtn || !registrationLockStateEl) return;
+  registrationLockBtn.textContent = registrationLockedDown ? "Unlock Registration" : "Lock Registration";
+  registrationLockBtn.classList.toggle("btn-warning", !registrationLockedDown);
+  registrationLockBtn.classList.toggle("btn-danger", registrationLockedDown);
+  registrationLockStateEl.textContent = registrationLockedDown
+    ? "Registration lockdown is on. New accounts are created frozen."
+    : "Registration lockdown is off. New accounts can contribute immediately.";
+}
 
 function computeTotalCompletion(items) {
   let totalGathered = 0;
@@ -73,11 +109,14 @@ async function authCheck() {
     const data = await res.json();
     currentUsername = data.username;
     isAdmin = data.admin;
+    isFrozen = Boolean(data.frozen);
     loginRow.style.display = "none";
     document.getElementById("userBar").style.display = "flex";
-    document.getElementById("currentUser").textContent = currentUsername;
+    setContributionAvailability();
     if (isAdmin) {
       document.getElementById("adminPanel").style.display = "block";
+      setAdminStatus("Use Remove Edits to revoke one account's contributions and claims.", "info");
+      loadAdminSettings();
       loadAdminUsers();
     } else {
       document.getElementById("adminPanel").style.display = "none";
@@ -87,9 +126,11 @@ async function authCheck() {
   } else {
     currentUsername = null;
     isAdmin = false;
+    isFrozen = false;
     loginRow.style.display = "flex";
     document.getElementById("userBar").style.display = "none";
     document.getElementById("adminPanel").style.display = "none";
+    setAdminStatus("", "info");
   }
 }
 
@@ -149,6 +190,7 @@ document.getElementById("logoutBtn").onclick = async () => {
   await fetch("api/logout", { method: "POST" });
   currentUsername = null;
   isAdmin = false;
+  isFrozen = false;
   itemsEl.innerHTML = "";
   currentItems = [];
   allItems = [];
@@ -561,6 +603,7 @@ function paintClaims(el, item) {
 }
 
 async function update(item, id, val) {
+  if (isFrozen) return;
   if (claimMode) {
     const remaining = Math.max(item.target - item.gathered, 0);
     const claimed = Math.min(Math.max(val - item.gathered, 0), remaining);
@@ -575,10 +618,11 @@ async function update(item, id, val) {
   lastUpdate[item.name] = val;
   const count = document.getElementById(id);
   if (count) count.textContent = val;
+  const delta = val - item.gathered;
   await fetch("api/items/update", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: item.name, gathered: val })
+    body: JSON.stringify({ name: item.name, gathered: val, delta })
   });
 }
 
@@ -629,6 +673,7 @@ function enableDrag(slider, max, onEndDrag = () => {}) {
 }
 
 function clearClaim(itemName) {
+  if (isFrozen) return;
   fetch("api/items/claim", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -670,6 +715,14 @@ async function loadAdminUsers() {
   renderAdminUsers(users);
 }
 
+async function loadAdminSettings() {
+  const res = await fetch("api/admin/settings");
+  if (!res.ok) return;
+  const settings = await res.json();
+  registrationLockedDown = Boolean(settings.registration_locked_down);
+  renderRegistrationLockState();
+}
+
 function renderAdminUsers(users) {
   const list = document.getElementById("userList");
   list.innerHTML = "";
@@ -681,8 +734,14 @@ function renderAdminUsers(users) {
     const row = document.createElement("div");
     row.className = "user-row";
     row.innerHTML = `
-      <span class="user-name">${u.username}${u.admin ? ' <span class="admin-badge">admin</span>' : ''}</span>
+      <span class="user-name">${u.username}${u.admin ? ' <span class="admin-badge">admin</span>' : ''}${u.frozen ? ' <span class="frozen-badge">frozen</span>' : ''}</span>
       <div class="user-actions">
+        <button class="btn-sm ${u.frozen ? '' : 'btn-warning'}" data-action="toggle_frozen" data-user="${u.username}">
+          ${u.frozen ? "Unfreeze" : "Freeze"}
+        </button>
+        <button class="btn-sm btn-warning" data-action="purge_progress" data-user="${u.username}">
+          Remove Edits
+        </button>
         <button class="btn-sm" data-action="toggle_admin" data-user="${u.username}">
           ${u.admin ? "Remove Admin" : "Make Admin"}
         </button>
@@ -700,15 +759,58 @@ function renderAdminUsers(users) {
     btn.onclick = async () => {
       const action = btn.dataset.action;
       const username = btn.dataset.user;
-      if (action === "delete" && !confirm(`Delete user "${username}"? This cannot be undone.`)) return;
+      const actionLabel = action === "purge_progress" ? "remove edits for" : action === "delete" ? "delete" : action === "toggle_frozen" ? "toggle freeze for" : "update";
+      if (action === "purge_progress" && !confirm(`Remove all collected progress and claims made by "${username}"? This cannot be undone.`)) return;
+      if (action === "delete" && !confirm(`Delete user "${username}" and remove all of their collected progress and claims? This cannot be undone.`)) return;
+      if (action === "toggle_frozen" && !confirm(`Toggle whether "${username}" can make contributions?`)) return;
+      setAdminStatus(`Working on ${actionLabel} ${username}...`, "info");
       const res = await fetch("api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, action })
       });
-      if (res.ok) loadAdminUsers();
+      if (res.ok) {
+        if (action === "purge_progress") {
+          setAdminStatus(`Removed all edits and claims made by ${username}.`, "success");
+        } else if (action === "delete") {
+          setAdminStatus(`Deleted ${username} and removed their edits.`, "success");
+        } else if (action === "toggle_frozen") {
+          setAdminStatus(`Updated contribution access for ${username}.`, "success");
+        } else {
+          setAdminStatus(`Updated ${username}.`, "success");
+        }
+        loadAdminUsers();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setAdminStatus(data.error || `Failed to ${actionLabel} ${username}.`, "error");
+      }
     };
   });
+}
+
+if (registrationLockBtn) {
+  registrationLockBtn.onclick = async () => {
+    const nextValue = !registrationLockedDown;
+    setAdminStatus(`${nextValue ? "Enabling" : "Disabling"} registration lockdown...`, "info");
+    const res = await fetch("api/admin/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ registration_locked_down: nextValue })
+    });
+    if (res.ok) {
+      registrationLockedDown = nextValue;
+      renderRegistrationLockState();
+      setAdminStatus(
+        nextValue
+          ? "Registration lockdown enabled. New accounts will be created frozen."
+          : "Registration lockdown disabled. New accounts can contribute immediately.",
+        "success"
+      );
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setAdminStatus(data.error || "Failed to update registration lockdown.", "error");
+    }
+  };
 }
 
 authCheck();

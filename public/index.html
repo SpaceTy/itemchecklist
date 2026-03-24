@@ -69,7 +69,17 @@
     </div>
     <div id="items"></div>
     <div id="adminPanel" style="display:none">
-      <h2>User Management</h2>
+      <div class="admin-header">
+        <div>
+          <h2>User Management</h2>
+          <p class="admin-help">Admins can remove edits, freeze accounts, and lock down new registrations so new accounts stay frozen until approved.</p>
+        </div>
+        <div id="adminStatus" class="admin-status" aria-live="polite"></div>
+      </div>
+      <div class="admin-controls">
+        <button id="registrationLockBtn" class="btn-sm">Lock Registration</button>
+        <span id="registrationLockState" class="admin-lock-state"></span>
+      </div>
       <div id="userList"></div>
     </div>
     <div id="completion-bar">

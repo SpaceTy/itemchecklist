@@ -6,12 +6,13 @@ import (
 )
 
 const (
-	port       = 3001
-	usersPath  = "users.json"
-	itemsPath  = "items.json"
-	backupsDir = "backups"
-	secretPath = "secret.key"
-	tokenTTL   = 30 * 24 * time.Hour
+	port         = 3001
+	usersPath    = "users.json"
+	settingsPath = "settings.json"
+	itemsPath    = "items.json"
+	backupsDir   = "backups"
+	secretPath   = "secret.key"
+	tokenTTL     = 30 * 24 * time.Hour
 )
 
 func newServerMux(broker *sseBroker) *http.ServeMux {
@@ -28,11 +29,12 @@ func newServerMux(broker *sseBroker) *http.ServeMux {
 
 	register("/api/check-auth", requireAuth(checkAuthHandler))
 	register("/api/items", requireAuth(getItemsHandler))
-	register("/api/items/update", requireAuth(updateItemHandler(broker)))
-	register("/api/items/claim", requireAuth(claimItemHandler(broker)))
+	register("/api/items/update", requireContributionAccess(updateItemHandler(broker)))
+	register("/api/items/claim", requireContributionAccess(claimItemHandler(broker)))
 	register("/events", requireAuth(sseHandler(broker)))
 
-	register("/api/admin/users", requireAdmin(adminUsersHandler))
+	register("/api/admin/users", requireAdmin(adminUsersHandler(broker)))
+	register("/api/admin/settings", requireAdmin(adminSettingsHandler))
 
 	mux.HandleFunc("/", staticFileHandler)
 	return mux

@@ -100,6 +100,22 @@ func requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
+func requireContributionAccess(next http.HandlerFunc) http.HandlerFunc {
+	return requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		username := r.Context().Value(usernameKey).(string)
+		u, err := findUser(username)
+		if err != nil || u == nil {
+			http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		if u.Frozen {
+			http.Error(w, `{"error":"Your account is frozen and cannot make contributions until an admin unfreezes it"}`, http.StatusForbidden)
+			return
+		}
+		next(w, r)
+	})
+}
+
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -187,7 +203,18 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newUser := user{Username: req.Username, PasswordHash: string(hash), Admin: false}
+	settings, err := readSettings()
+	if err != nil {
+		http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	newUser := user{
+		Username:     req.Username,
+		PasswordHash: string(hash),
+		Admin:        false,
+		Frozen:       settings.RegistrationLockedDown,
+	}
 	users = append(users, newUser)
 	if err := writeUsers(users); err != nil {
 		http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
@@ -201,7 +228,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	setAuthCookie(w, token, int(tokenTTL.Seconds()))
-	writeJSON(w, map[string]any{"success": true, "username": newUser.Username, "admin": false})
+	writeJSON(w, map[string]any{"success": true, "username": newUser.Username, "admin": false, "frozen": newUser.Frozen})
 }
 
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -222,6 +249,7 @@ func checkAuthHandler(w http.ResponseWriter, r *http.Request) {
 		"success":  true,
 		"username": username,
 		"admin":    isAdmin,
+		"frozen":   err == nil && u != nil && u.Frozen,
 	})
 }
 
