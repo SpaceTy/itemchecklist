@@ -2,6 +2,7 @@ archive/
 backups/
 node_modules/
 items.json
+users.json
 raw.md
 node-archive/
 AGENTS.md

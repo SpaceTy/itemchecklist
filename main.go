@@ -3,6 +3,9 @@
 package main
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,18 +16,49 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
 	port       = 3001
-	configPath = "config.json"
+	usersPath  = "users.json"
 	itemsPath  = "items.json"
 	backupsDir = "backups"
 )
 
-type config struct {
-	Passwords []string `json:"passwords"`
+// ── User types ───────────────────────────────────────────────────────────────
+
+type user struct {
+	Username     string `json:"username"`
+	PasswordHash string `json:"password_hash"`
+	Admin        bool   `json:"admin"`
 }
+
+// userInfo is the safe public view of a user (no password hash).
+type userInfo struct {
+	Username string `json:"username"`
+	Admin    bool   `json:"admin"`
+}
+
+// ── Request types ─────────────────────────────────────────────────────────────
+
+type loginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type registerRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type adminUserRequest struct {
+	Username string `json:"username"`
+	Action   string `json:"action"` // "delete" | "toggle_admin"
+}
+
+// ── Item types ────────────────────────────────────────────────────────────────
 
 type item struct {
 	Name     string  `json:"name"`
@@ -39,10 +73,6 @@ type claim struct {
 	ClaimEnd   int    `json:"claim_end"`
 }
 
-type loginRequest struct {
-	Password string `json:"password"`
-}
-
 type updateItemRequest struct {
 	Name     string `json:"name"`
 	Gathered int    `json:"gathered"`
@@ -51,13 +81,10 @@ type updateItemRequest struct {
 type claimItemRequest struct {
 	Name    string `json:"name"`
 	Claimed int    `json:"claimed"`
-	Claimer string `json:"claimer"`
+	// Claimer is read from the session, not the request body.
 }
 
-type passwordRequest struct {
-	Password string `json:"password"`
-	Action   string `json:"action"`
-}
+// ── SSE types ─────────────────────────────────────────────────────────────────
 
 type sseMessage struct {
 	Type  string `json:"type"`
@@ -71,9 +98,7 @@ type sseBroker struct {
 }
 
 func newSSEBroker() *sseBroker {
-	return &sseBroker{
-		clients: make(map[int]chan string),
-	}
+	return &sseBroker{clients: make(map[int]chan string)}
 }
 
 func (b *sseBroker) addClient(ch chan string) int {
@@ -98,15 +123,94 @@ func (b *sseBroker) broadcast(msg string) {
 		select {
 		case ch <- msg:
 		default:
-			// Drop stale client that cannot keep up.
 			delete(b.clients, id)
 		}
 	}
 }
 
+// ── Session management ────────────────────────────────────────────────────────
+
+var (
+	sessionsMu sync.RWMutex
+	sessions   = make(map[string]string) // token → username
+)
+
+func generateToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+func setSession(token, username string) {
+	sessionsMu.Lock()
+	defer sessionsMu.Unlock()
+	sessions[token] = username
+}
+
+func getSession(token string) (string, bool) {
+	sessionsMu.RLock()
+	defer sessionsMu.RUnlock()
+	u, ok := sessions[token]
+	return u, ok
+}
+
+func deleteSession(token string) {
+	sessionsMu.Lock()
+	defer sessionsMu.Unlock()
+	delete(sessions, token)
+}
+
+// ── Context key ───────────────────────────────────────────────────────────────
+
+type contextKey string
+
+const usernameKey contextKey = "username"
+
+// ── Auth middleware ───────────────────────────────────────────────────────────
+
+func requireAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("auth_token")
+		if err != nil {
+			http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		username, ok := getSession(cookie.Value)
+		if !ok {
+			http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		ctx := context.WithValue(r.Context(), usernameKey, username)
+		next(w, r.WithContext(ctx))
+	}
+}
+
+func requireAdmin(next http.HandlerFunc) http.HandlerFunc {
+	return requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		username := r.Context().Value(usernameKey).(string)
+		u, err := findUser(username)
+		if err != nil || u == nil || !u.Admin {
+			http.Error(w, `{"error":"Forbidden"}`, http.StatusForbidden)
+			return
+		}
+		next(w, r)
+	})
+}
+
+// ── main ──────────────────────────────────────────────────────────────────────
+
 func main() {
 	if err := os.MkdirAll(backupsDir, 0755); err != nil {
 		log.Fatalf("creating backups dir: %v", err)
+	}
+
+	if _, err := os.Stat(usersPath); os.IsNotExist(err) {
+		if err := writeJSONFile(usersPath, []user{}); err != nil {
+			log.Fatalf("creating users file: %v", err)
+		}
+		log.Printf("Created empty %s", usersPath)
 	}
 
 	broker := newSSEBroker()
@@ -115,22 +219,25 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// Register API handlers with and without /itemchecklist/ prefix
-	mux.HandleFunc("/api/login", loginHandler)
-	mux.HandleFunc("/api/check-auth", requireAuth(checkAuthHandler))
-	mux.HandleFunc("/api/items", requireAuth(getItemsHandler))
-	mux.HandleFunc("/api/items/update", requireAuth(updateItemHandler(broker)))
-	mux.HandleFunc("/api/items/claim", requireAuth(claimItemHandler(broker)))
-	mux.HandleFunc("/api/config/passwords", requireAuth(passwordsHandler))
-	mux.HandleFunc("/events", requireAuth(sseHandler(broker)))
+	register := func(pattern string, h http.HandlerFunc) {
+		mux.HandleFunc(pattern, h)
+		mux.HandleFunc("/itemchecklist"+pattern, h)
+	}
 
-	mux.HandleFunc("/itemchecklist/api/login", loginHandler)
-	mux.HandleFunc("/itemchecklist/api/check-auth", requireAuth(checkAuthHandler))
-	mux.HandleFunc("/itemchecklist/api/items", requireAuth(getItemsHandler))
-	mux.HandleFunc("/itemchecklist/api/items/update", requireAuth(updateItemHandler(broker)))
-	mux.HandleFunc("/itemchecklist/api/items/claim", requireAuth(claimItemHandler(broker)))
-	mux.HandleFunc("/itemchecklist/api/config/passwords", requireAuth(passwordsHandler))
-	mux.HandleFunc("/itemchecklist/events", requireAuth(sseHandler(broker)))
+	// Public
+	register("/api/login", loginHandler)
+	register("/api/register", registerHandler)
+	register("/api/logout", logoutHandler)
+
+	// Authenticated
+	register("/api/check-auth", requireAuth(checkAuthHandler))
+	register("/api/items", requireAuth(getItemsHandler))
+	register("/api/items/update", requireAuth(updateItemHandler(broker)))
+	register("/api/items/claim", requireAuth(claimItemHandler(broker)))
+	register("/events", requireAuth(sseHandler(broker)))
+
+	// Admin only
+	register("/api/admin/users", requireAdmin(adminUsersHandler))
 
 	mux.HandleFunc("/", staticFileHandler)
 
@@ -140,8 +247,9 @@ func main() {
 	}
 }
 
+// ── Static file handler ───────────────────────────────────────────────────────
+
 func staticFileHandler(w http.ResponseWriter, r *http.Request) {
-	// Strip the /itemchecklist/ prefix if present (for local dev compatibility)
 	path := r.URL.Path
 	path = strings.TrimPrefix(path, "/itemchecklist")
 
@@ -149,7 +257,6 @@ func staticFileHandler(w http.ResponseWriter, r *http.Request) {
 		path = "/index.html"
 	}
 
-	// Read the file from the public directory
 	filePath := filepath.Join("public", path)
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -157,7 +264,6 @@ func staticFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set the correct Content-Type based on file extension
 	contentType := "text/plain"
 	switch filepath.Ext(filePath) {
 	case ".html":
@@ -192,6 +298,8 @@ func staticFileHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// ── Auth handlers ─────────────────────────────────────────────────────────────
+
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -200,47 +308,235 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid body", http.StatusBadRequest)
+		http.Error(w, `{"error":"Invalid body"}`, http.StatusBadRequest)
 		return
 	}
 
-	cfg, err := readConfig()
+	req.Username = strings.TrimSpace(req.Username)
+	if req.Username == "" || req.Password == "" {
+		http.Error(w, `{"error":"Username and password required"}`, http.StatusBadRequest)
+		return
+	}
+
+	u, err := findUser(req.Username)
 	if err != nil {
-		http.Error(w, "config not available", http.StatusInternalServerError)
+		http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
+		return
+	}
+	if u == nil || bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password)) != nil {
+		http.Error(w, `{"error":"Invalid username or password"}`, http.StatusUnauthorized)
 		return
 	}
 
-	if !contains(cfg.Passwords, req.Password) {
-		http.Error(w, `{"error":"Invalid password"}`, http.StatusUnauthorized)
+	token, err := generateToken()
+	if err != nil {
+		http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
 		return
+	}
+	setSession(token, u.Username)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Path:     "/itemchecklist/",
+		MaxAge:   30 * 24 * 60 * 60,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	writeJSON(w, map[string]any{"success": true, "username": u.Username, "admin": u.Admin})
+}
+
+func registerHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req registerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"Invalid body"}`, http.StatusBadRequest)
+		return
+	}
+
+	req.Username = strings.TrimSpace(req.Username)
+
+	if req.Username == "" {
+		http.Error(w, `{"error":"Username is required"}`, http.StatusBadRequest)
+		return
+	}
+	if strings.ContainsAny(req.Username, " \t\n\r") {
+		http.Error(w, `{"error":"Username must not contain spaces"}`, http.StatusBadRequest)
+		return
+	}
+	if len(req.Username) > 32 {
+		http.Error(w, `{"error":"Username must be 32 characters or fewer"}`, http.StatusBadRequest)
+		return
+	}
+	if len(req.Password) < 6 {
+		http.Error(w, `{"error":"Password must be at least 6 characters"}`, http.StatusBadRequest)
+		return
+	}
+
+	users, err := readUsers()
+	if err != nil {
+		http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
+		return
+	}
+	for _, u := range users {
+		if strings.EqualFold(u.Username, req.Username) {
+			http.Error(w, `{"error":"Username already taken"}`, http.StatusConflict)
+			return
+		}
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	newUser := user{Username: req.Username, PasswordHash: string(hash), Admin: false}
+	users = append(users, newUser)
+	if err := writeUsers(users); err != nil {
+		http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Auto-login after registration.
+	token, err := generateToken()
+	if err != nil {
+		http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
+		return
+	}
+	setSession(token, newUser.Username)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Path:     "/itemchecklist/",
+		MaxAge:   30 * 24 * 60 * 60,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	writeJSON(w, map[string]any{"success": true, "username": newUser.Username, "admin": false})
+}
+
+func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if cookie, err := r.Cookie("auth_token"); err == nil {
+		deleteSession(cookie.Value)
 	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
-		Value:    req.Password,
+		Value:    "",
 		Path:     "/itemchecklist/",
-		MaxAge:   30 * 24 * 60 * 60,
-		HttpOnly: false,
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	writeJSON(w, map[string]bool{"success": true})
 }
 
-func checkAuthHandler(w http.ResponseWriter, r *http.Request, _ config) {
-	writeJSON(w, map[string]bool{"success": true})
+func checkAuthHandler(w http.ResponseWriter, r *http.Request) {
+	username := r.Context().Value(usernameKey).(string)
+	u, err := findUser(username)
+	isAdmin := err == nil && u != nil && u.Admin
+	writeJSON(w, map[string]any{
+		"success":  true,
+		"username": username,
+		"admin":    isAdmin,
+	})
 }
 
-func getItemsHandler(w http.ResponseWriter, r *http.Request, _ config) {
+// ── Admin handlers ────────────────────────────────────────────────────────────
+
+func adminUsersHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		users, err := readUsers()
+		if err != nil {
+			http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
+			return
+		}
+		info := make([]userInfo, len(users))
+		for i, u := range users {
+			info[i] = userInfo{Username: u.Username, Admin: u.Admin}
+		}
+		writeJSON(w, info)
+
+	case http.MethodPost:
+		var req adminUserRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"Invalid body"}`, http.StatusBadRequest)
+			return
+		}
+
+		callerUsername := r.Context().Value(usernameKey).(string)
+
+		users, err := readUsers()
+		if err != nil {
+			http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		idx := -1
+		for i, u := range users {
+			if u.Username == req.Username {
+				idx = i
+				break
+			}
+		}
+		if idx == -1 {
+			http.Error(w, `{"error":"User not found"}`, http.StatusNotFound)
+			return
+		}
+
+		switch req.Action {
+		case "delete":
+			if users[idx].Username == callerUsername {
+				http.Error(w, `{"error":"Cannot delete your own account"}`, http.StatusBadRequest)
+				return
+			}
+			users = append(users[:idx], users[idx+1:]...)
+		case "toggle_admin":
+			users[idx].Admin = !users[idx].Admin
+		default:
+			http.Error(w, `{"error":"Unknown action"}`, http.StatusBadRequest)
+			return
+		}
+
+		if err := writeUsers(users); err != nil {
+			http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]bool{"success": true})
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// ── Item handlers ─────────────────────────────────────────────────────────────
+
+func getItemsHandler(w http.ResponseWriter, r *http.Request) {
 	items, err := readItems()
 	if err != nil {
-		http.Error(w, "could not read items", http.StatusInternalServerError)
+		http.Error(w, `{"error":"Could not read items"}`, http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, items)
 }
 
-func updateItemHandler(b *sseBroker) func(http.ResponseWriter, *http.Request, config) {
-	return func(w http.ResponseWriter, r *http.Request, _ config) {
+func updateItemHandler(b *sseBroker) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -248,13 +544,13 @@ func updateItemHandler(b *sseBroker) func(http.ResponseWriter, *http.Request, co
 
 		var req updateItemRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid body", http.StatusBadRequest)
+			http.Error(w, `{"error":"Invalid body"}`, http.StatusBadRequest)
 			return
 		}
 
 		items, err := readItems()
 		if err != nil {
-			http.Error(w, "could not read items", http.StatusInternalServerError)
+			http.Error(w, `{"error":"Could not read items"}`, http.StatusInternalServerError)
 			return
 		}
 
@@ -267,7 +563,6 @@ func updateItemHandler(b *sseBroker) func(http.ResponseWriter, *http.Request, co
 				if req.Gathered > items[i].Target {
 					req.Gathered = items[i].Target
 				}
-
 				items[i].Gathered = req.Gathered
 				updated = true
 				break
@@ -280,22 +575,19 @@ func updateItemHandler(b *sseBroker) func(http.ResponseWriter, *http.Request, co
 		}
 
 		if err := writeItems(items); err != nil {
-			http.Error(w, "could not write items", http.StatusInternalServerError)
+			http.Error(w, `{"error":"Could not write items"}`, http.StatusInternalServerError)
 			return
 		}
 
-		payload, _ := json.Marshal(sseMessage{
-			Type:  "update",
-			Items: items,
-		})
+		payload, _ := json.Marshal(sseMessage{Type: "update", Items: items})
 		b.broadcast(string(payload))
 
 		writeJSON(w, map[string]bool{"success": true})
 	}
 }
 
-func claimItemHandler(b *sseBroker) func(http.ResponseWriter, *http.Request, config) {
-	return func(w http.ResponseWriter, r *http.Request, _ config) {
+func claimItemHandler(b *sseBroker) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -303,19 +595,16 @@ func claimItemHandler(b *sseBroker) func(http.ResponseWriter, *http.Request, con
 
 		var req claimItemRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid body", http.StatusBadRequest)
+			http.Error(w, `{"error":"Invalid body"}`, http.StatusBadRequest)
 			return
 		}
 
-		req.Claimer = strings.TrimSpace(req.Claimer)
-		if req.Claimer == "" {
-			http.Error(w, `{"error":"Claimer required"}`, http.StatusBadRequest)
-			return
-		}
+		// Claimer is always the authenticated user.
+		claimer := r.Context().Value(usernameKey).(string)
 
 		items, err := readItems()
 		if err != nil {
-			http.Error(w, "could not read items", http.StatusInternalServerError)
+			http.Error(w, `{"error":"Could not read items"}`, http.StatusInternalServerError)
 			return
 		}
 
@@ -334,12 +623,12 @@ func claimItemHandler(b *sseBroker) func(http.ResponseWriter, *http.Request, con
 				}
 
 				if req.Claimed == 0 {
-					removeClaimByName(&items[i], req.Claimer)
+					removeClaimByName(&items[i], claimer)
 				} else {
-					existingClaim := getClaimByName(&items[i], req.Claimer)
+					existingClaim := getClaimByName(&items[i], claimer)
 					if existingClaim == nil {
 						items[i].Claims = append(items[i].Claims, claim{
-							Claimer:    req.Claimer,
+							Claimer:    claimer,
 							ClaimStart: items[i].Gathered,
 							ClaimEnd:   items[i].Gathered + req.Claimed,
 						})
@@ -359,92 +648,40 @@ func claimItemHandler(b *sseBroker) func(http.ResponseWriter, *http.Request, con
 		}
 
 		if err := writeItems(items); err != nil {
-			http.Error(w, "could not write items", http.StatusInternalServerError)
+			http.Error(w, `{"error":"Could not write items"}`, http.StatusInternalServerError)
 			return
 		}
 
-		payload, _ := json.Marshal(sseMessage{
-			Type:  "update",
-			Items: items,
-		})
+		payload, _ := json.Marshal(sseMessage{Type: "update", Items: items})
 		b.broadcast(string(payload))
 
 		writeJSON(w, map[string]bool{"success": true})
 	}
 }
 
-func removeClaimByName(item *item, name string) {
+func removeClaimByName(it *item, name string) {
 	var newClaims []claim
-	for _, claim := range item.Claims {
-		if claim.Claimer != name {
-			newClaims = append(newClaims, claim)
+	for _, c := range it.Claims {
+		if c.Claimer != name {
+			newClaims = append(newClaims, c)
 		}
 	}
-	item.Claims = newClaims
+	it.Claims = newClaims
 }
 
-func getClaimByName(item *item, name string) *claim {
-	for i, claim := range item.Claims {
-		if claim.Claimer == name {
-			return &item.Claims[i]
+func getClaimByName(it *item, name string) *claim {
+	for i := range it.Claims {
+		if it.Claims[i].Claimer == name {
+			return &it.Claims[i]
 		}
 	}
 	return nil
 }
 
-func passwordsHandler(w http.ResponseWriter, r *http.Request, cfg config) {
-	switch r.Method {
-	case http.MethodGet:
-		writeJSON(w, cfg.Passwords)
-	case http.MethodPost:
-		var req passwordRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid body", http.StatusBadRequest)
-			return
-		}
+// ── SSE handler ───────────────────────────────────────────────────────────────
 
-		switch strings.ToLower(req.Action) {
-		case "add":
-			if contains(cfg.Passwords, req.Password) {
-				http.Error(w, `{"error":"Password already exists"}`, http.StatusBadRequest)
-				return
-			}
-			cfg.Passwords = append(cfg.Passwords, req.Password)
-			if err := writeConfig(cfg); err != nil {
-				http.Error(w, "could not write config", http.StatusInternalServerError)
-				return
-			}
-			writeJSON(w, map[string]any{"success": true, "passwords": cfg.Passwords})
-		case "remove":
-			if !contains(cfg.Passwords, req.Password) {
-				http.Error(w, `{"error":"Password not found"}`, http.StatusNotFound)
-				return
-			}
-			if len(cfg.Passwords) <= 1 {
-				http.Error(w, `{"error":"Cannot remove the last password"}`, http.StatusBadRequest)
-				return
-			}
-			cfg.Passwords = remove(cfg.Passwords, req.Password)
-			if err := writeConfig(cfg); err != nil {
-				http.Error(w, "could not write config", http.StatusInternalServerError)
-				return
-			}
-			writeJSON(w, map[string]any{"success": true, "passwords": cfg.Passwords})
-		default:
-			http.Error(w, `{"error":"Invalid action"}`, http.StatusBadRequest)
-		}
-	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-func sseHandler(b *sseBroker) func(http.ResponseWriter, *http.Request, config) {
-	return func(w http.ResponseWriter, r *http.Request, cfg config) {
-		if !isAuthorized(r, cfg) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-
+func sseHandler(b *sseBroker) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
 			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
@@ -459,7 +696,6 @@ func sseHandler(b *sseBroker) func(http.ResponseWriter, *http.Request, config) {
 		id := b.addClient(ch)
 		defer b.removeClient(id)
 
-		// Flush headers immediately so the client establishes the stream, even before any events.
 		if _, err := fmt.Fprint(w, ": connected\n\n"); err == nil {
 			flusher.Flush()
 		}
@@ -486,42 +722,37 @@ func sseHandler(b *sseBroker) func(http.ResponseWriter, *http.Request, config) {
 	}
 }
 
-func requireAuth(next func(http.ResponseWriter, *http.Request, config)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cfg, err := readConfig()
-		if err != nil {
-			http.Error(w, "config not available", http.StatusInternalServerError)
-			return
-		}
+// ── User file helpers ─────────────────────────────────────────────────────────
 
-		if !isAuthorized(r, cfg) {
-			http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
-			return
-		}
-
-		next(w, r, cfg)
+func readUsers() ([]user, error) {
+	var users []user
+	if _, err := os.Stat(usersPath); os.IsNotExist(err) {
+		return []user{}, nil
 	}
+	if err := readJSONFile(usersPath, &users); err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
-func isAuthorized(r *http.Request, cfg config) bool {
-	cookie, err := r.Cookie("auth_token")
+func writeUsers(users []user) error {
+	return writeJSONFile(usersPath, users)
+}
+
+func findUser(username string) (*user, error) {
+	users, err := readUsers()
 	if err != nil {
-		return false
+		return nil, err
 	}
-	return contains(cfg.Passwords, cookie.Value)
+	for i := range users {
+		if users[i].Username == username {
+			return &users[i], nil
+		}
+	}
+	return nil, nil
 }
 
-func readConfig() (config, error) {
-	var cfg config
-	if err := readJSONFile(configPath, &cfg); err != nil {
-		return cfg, err
-	}
-	return cfg, nil
-}
-
-func writeConfig(cfg config) error {
-	return writeJSONFile(configPath, cfg)
-}
+// ── Item file helpers ─────────────────────────────────────────────────────────
 
 func readItems() ([]item, error) {
 	var items []item
@@ -540,6 +771,8 @@ func readItems() ([]item, error) {
 func writeItems(items []item) error {
 	return writeJSONFile(itemsPath, items)
 }
+
+// ── Generic JSON helpers ──────────────────────────────────────────────────────
 
 func readJSONFile(path string, v any) error {
 	data, err := os.ReadFile(path)
@@ -562,24 +795,7 @@ func writeJSON(w http.ResponseWriter, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func contains(list []string, value string) bool {
-	for _, v := range list {
-		if v == value {
-			return true
-		}
-	}
-	return false
-}
-
-func remove(list []string, value string) []string {
-	out := list[:0]
-	for _, v := range list {
-		if v != value {
-			out = append(out, v)
-		}
-	}
-	return out
-}
+// ── Backup helpers ────────────────────────────────────────────────────────────
 
 func scheduleBackups() {
 	ticker := time.NewTicker(5 * time.Minute)
@@ -650,11 +866,8 @@ func cleanupBackups() {
 
 	now := time.Now()
 	toKeep := make(map[string]bool)
-
-	// Always keep the first backup
 	toKeep[backups[0].name] = true
 
-	// Define retention periods
 	var (
 		recent  = 2 * time.Hour
 		hourly  = 24 * time.Hour
@@ -663,14 +876,12 @@ func cleanupBackups() {
 		monthly = 365 * 24 * time.Hour
 	)
 
-	// Keep all backups from the last 2 hours
 	for _, b := range backups {
 		if now.Sub(b.time) <= recent {
 			toKeep[b.name] = true
 		}
 	}
 
-	// Keep one backup per hour for the last day
 	hourlyBuckets := make(map[string]backupFile)
 	for _, b := range backups {
 		age := now.Sub(b.time)
@@ -685,7 +896,6 @@ func cleanupBackups() {
 		toKeep[b.name] = true
 	}
 
-	// Keep one backup per day for the last week
 	dailyBuckets := make(map[string]backupFile)
 	for _, b := range backups {
 		age := now.Sub(b.time)
@@ -700,7 +910,6 @@ func cleanupBackups() {
 		toKeep[b.name] = true
 	}
 
-	// Keep one backup per week for the last month
 	weeklyBuckets := make(map[string]backupFile)
 	for _, b := range backups {
 		age := now.Sub(b.time)
@@ -716,7 +925,6 @@ func cleanupBackups() {
 		toKeep[b.name] = true
 	}
 
-	// Keep one backup per month for the last year
 	monthlyBuckets := make(map[string]backupFile)
 	for _, b := range backups {
 		age := now.Sub(b.time)
@@ -731,7 +939,6 @@ func cleanupBackups() {
 		toKeep[b.name] = true
 	}
 
-	// Keep one backup per year for everything older
 	yearlyBuckets := make(map[string]backupFile)
 	for _, b := range backups {
 		age := now.Sub(b.time)
@@ -746,7 +953,6 @@ func cleanupBackups() {
 		toKeep[b.name] = true
 	}
 
-	// Delete backups not in the keep list
 	for _, b := range backups {
 		if !toKeep[b.name] {
 			_ = os.Remove(filepath.Join(backupsDir, b.name))

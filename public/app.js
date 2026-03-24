@@ -1,6 +1,5 @@
 const itemsEl = document.getElementById("items");
 const loginRow = document.getElementById("login");
-const msg = document.getElementById("loginMsg");
 const claimBtn = document.getElementById("claimToggle");
 const claimLabel = document.getElementById("claimLabel");
 const completionToggle = document.getElementById("completionToggle");
@@ -19,6 +18,9 @@ let pendingRender = null;
 let currentItems = [];
 let searchQuery = "";
 let allItems = [];
+let currentUsername = null;
+let isAdmin = false;
+let eventSource = null;
 
 function computeTotalCompletion(items) {
   let totalGathered = 0;
@@ -66,24 +68,91 @@ function updateCompletionBar(items) {
 }
 
 async function authCheck() {
-  const ok = await fetch("api/check-auth").then(r => r.ok);
-  loginRow.style.display = ok ? "none" : "flex";
-  if (ok) {
+  const res = await fetch("api/check-auth");
+  if (res.ok) {
+    const data = await res.json();
+    currentUsername = data.username;
+    isAdmin = data.admin;
+    loginRow.style.display = "none";
+    document.getElementById("userBar").style.display = "flex";
+    document.getElementById("currentUser").textContent = currentUsername;
+    if (isAdmin) {
+      document.getElementById("adminPanel").style.display = "block";
+      loadAdminUsers();
+    } else {
+      document.getElementById("adminPanel").style.display = "none";
+    }
     loadItems();
     startStream();
+  } else {
+    currentUsername = null;
+    isAdmin = false;
+    loginRow.style.display = "flex";
+    document.getElementById("userBar").style.display = "none";
+    document.getElementById("adminPanel").style.display = "none";
   }
 }
 
 document.getElementById("loginBtn").onclick = async () => {
-  msg.textContent = "";
-  const pwd = document.getElementById("pwd").value.trim();
+  const msgEl = document.getElementById("loginMsg");
+  msgEl.textContent = "";
+  const username = document.getElementById("loginUsername").value.trim();
+  const password = document.getElementById("loginPassword").value;
   const res = await fetch("api/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password: pwd })
+    body: JSON.stringify({ username, password })
   });
-  msg.textContent = res.ok ? "" : "Invalid password";
-  if (res.ok) authCheck();
+  if (res.ok) {
+    authCheck();
+  } else {
+    const data = await res.json().catch(() => ({}));
+    msgEl.textContent = data.error || "Login failed";
+  }
+};
+
+document.getElementById("registerBtn").onclick = async () => {
+  const msgEl = document.getElementById("registerMsg");
+  msgEl.textContent = "";
+  const username = document.getElementById("regUsername").value.trim();
+  const password = document.getElementById("regPassword").value;
+  const res = await fetch("api/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password })
+  });
+  if (res.ok) {
+    authCheck();
+  } else {
+    const data = await res.json().catch(() => ({}));
+    msgEl.textContent = data.error || "Registration failed";
+  }
+};
+
+document.getElementById("showRegister").onclick = (e) => {
+  e.preventDefault();
+  document.getElementById("loginPanel").style.display = "none";
+  document.getElementById("registerPanel").style.display = "flex";
+};
+
+document.getElementById("showLogin").onclick = (e) => {
+  e.preventDefault();
+  document.getElementById("registerPanel").style.display = "none";
+  document.getElementById("loginPanel").style.display = "flex";
+};
+
+document.getElementById("logoutBtn").onclick = async () => {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+  await fetch("api/logout", { method: "POST" });
+  currentUsername = null;
+  isAdmin = false;
+  itemsEl.innerHTML = "";
+  currentItems = [];
+  allItems = [];
+  authCheck();
 };
 
 claimBtn.onchange = () => toggleClaimMode(claimBtn.checked);
@@ -479,22 +548,26 @@ function paintClaims(el, item) {
     const label = document.createElement("span");
     label.textContent = c.claimer;
     label.style.left = `${start}%`;
-    const clear = () => clearClaim(item.name, c.claimer);
-    bar.onclick = clear;
-    label.onclick = clear;
+    // Only show the clear button for the current user's own claim.
+    if (c.claimer === currentUsername) {
+      const clear = () => clearClaim(item.name);
+      bar.onclick = clear;
+      label.onclick = clear;
+      bar.title = "Click to remove your claim";
+      label.style.cursor = "pointer";
+    }
     el.append(label, bar);
   });
 }
 
 async function update(item, id, val) {
   if (claimMode) {
-    const claimer = document.getElementById("claimer").value.trim() || "anon";
     const remaining = Math.max(item.target - item.gathered, 0);
     const claimed = Math.min(Math.max(val - item.gathered, 0), remaining);
     await fetch("api/items/claim", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: item.name, claimed, claimer })
+      body: JSON.stringify({ name: item.name, claimed })
     });
     return;
   }
@@ -555,23 +628,87 @@ function enableDrag(slider, max, onEndDrag = () => {}) {
   slider.onpointercancel = endDrag;
 }
 
-function clearClaim(itemName, claimer) {
+function clearClaim(itemName) {
   fetch("api/items/claim", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: itemName, claimed: 0, claimer })
+    body: JSON.stringify({ name: itemName, claimed: 0 })
   });
 }
 
 function startStream() {
-  const es = new EventSource("events");
-  es.onmessage = e => {
-    try {
-      const data = JSON.parse(e.data);
-      if (data.type === "update") render(data.items);
-    } catch {}
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+  const connect = () => {
+    eventSource = new EventSource("events");
+    eventSource.onmessage = e => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === "update") render(data.items);
+      } catch {}
+    };
+    eventSource.onerror = () => {
+      eventSource.close();
+      eventSource = null;
+    };
   };
-  es.onerror = () => es.close();
+  // Defer until the page is fully loaded to avoid the browser warning
+  // "connection interrupted while page was loading".
+  if (document.readyState === "complete") {
+    connect();
+  } else {
+    window.addEventListener("load", connect, { once: true });
+  }
+}
+
+async function loadAdminUsers() {
+  const res = await fetch("api/admin/users");
+  if (!res.ok) return;
+  const users = await res.json();
+  renderAdminUsers(users);
+}
+
+function renderAdminUsers(users) {
+  const list = document.getElementById("userList");
+  list.innerHTML = "";
+  if (users.length === 0) {
+    list.innerHTML = '<p style="color:#64748b;margin:0">No users yet.</p>';
+    return;
+  }
+  users.forEach(u => {
+    const row = document.createElement("div");
+    row.className = "user-row";
+    row.innerHTML = `
+      <span class="user-name">${u.username}${u.admin ? ' <span class="admin-badge">admin</span>' : ''}</span>
+      <div class="user-actions">
+        <button class="btn-sm" data-action="toggle_admin" data-user="${u.username}">
+          ${u.admin ? "Remove Admin" : "Make Admin"}
+        </button>
+        <button class="btn-sm btn-danger" data-action="delete" data-user="${u.username}"
+          ${u.username === currentUsername ? "disabled title='Cannot delete your own account'" : ""}>
+          Delete
+        </button>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+
+  list.querySelectorAll("button[data-action]").forEach(btn => {
+    if (btn.disabled) return;
+    btn.onclick = async () => {
+      const action = btn.dataset.action;
+      const username = btn.dataset.user;
+      if (action === "delete" && !confirm(`Delete user "${username}"? This cannot be undone.`)) return;
+      const res = await fetch("api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, action })
+      });
+      if (res.ok) loadAdminUsers();
+    };
+  });
 }
 
 authCheck();
