@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -11,15 +12,30 @@ const (
 	settingsPath = "settings.json"
 	itemsPath    = "items.json"
 	listsPath    = "lists.json"
-	backupsDir   = "backups"
+	dbPath       = "itemchecklist.db"
 	secretPath   = "secret.key"
 	tokenTTL     = 30 * 24 * time.Hour
 )
+
+// mutationMu serializes state-changing requests so read-modify-write handlers
+// cannot overwrite each other's changes.
+var mutationMu sync.Mutex
+
+func serializeMutations(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
+			mutationMu.Lock()
+			defer mutationMu.Unlock()
+		}
+		next(w, r)
+	}
+}
 
 func newServerMux(broker *sseBroker) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	register := func(pattern string, h http.HandlerFunc) {
+		h = serializeMutations(h)
 		mux.HandleFunc(pattern, h)
 		mux.HandleFunc("/itemchecklist"+pattern, h)
 	}

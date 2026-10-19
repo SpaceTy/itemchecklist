@@ -3,6 +3,11 @@ backups/
 node_modules/
 items.json
 users.json
+settings.json
+lists.json
+itemchecklist.db
+itemchecklist.db-shm
+itemchecklist.db-wal
 secret.key
 raw.md
 node-archive/

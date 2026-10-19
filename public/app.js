@@ -870,7 +870,7 @@ function createListCard(list, actions) {
         <div>
             <div class="list-card-head">
                 <h3>${escapeHtml(list.name)}</h3>
-                <span class="pill">${escapeHtml(list.role)}</span>
+                <span class="pill ${list.deleted ? "warn" : ""}">${escapeHtml(list.deleted ? "deleted" : list.role)}</span>
             </div>
             <p class="muted">Owner: ${escapeHtml(list.owner_username)}</p>
             <p class="muted">${list.item_count} items · ${list.collaborators.length} collaborators</p>
@@ -886,6 +886,9 @@ function createListCard(list, actions) {
     manageBtn.onclick = actions.onManage;
     deleteBtn.onclick = actions.onDelete;
     if (!list.can_manage && !state.isAdmin) {
+        deleteBtn.style.display = "none";
+    }
+    if (list.deleted) {
         deleteBtn.style.display = "none";
     }
     return card;
@@ -912,6 +915,7 @@ function buildManagePanel(list, adminMode) {
             <p class="muted" style="margin:0">Owner: ${escapeHtml(list.owner_username)} &middot; ${list.items.length} items</p>
             <div class="manage-actions">
                 <span class="pill">${escapeHtml(list.role)}</span>
+                <button class="ghost-btn history-btn">History</button>
                 <button class="ghost-btn open-list-btn">Open</button>
                 <button class="danger-btn delete-list-btn">Delete</button>
             </div>
@@ -1028,6 +1032,108 @@ function buildManagePanel(list, adminMode) {
             });
     }
     wrapper.appendChild(itemsSection);
+
+    /* ── Change tree history & rollback ── */
+    const historySection = document.createElement("section");
+    historySection.className = "subpanel";
+    historySection.style.display = "none";
+    historySection.innerHTML = `
+        <div class="subpanel-head">
+            <h4>Change Tree</h4>
+            <button class="ghost-btn refresh-history-btn">Refresh</button>
+        </div>
+        <p class="muted">Every change is kept as a branchable node. Individual amount changes older than 7 days are folded away; structural changes stay permanently.</p>
+        <div class="history-list" data-role="history"></div>
+    `;
+    const historyList = historySection.querySelector('[data-role="history"]');
+
+    async function loadHistory() {
+        historyList.innerHTML = '<div class="empty-state compact">Loading history…</div>';
+        const result = await api(`api/lists/${list.id}/history?limit=200`);
+        if (!result.ok) {
+            historyList.innerHTML = `<div class="empty-state compact">${escapeHtml(result.error || "Could not load history.")}</div>`;
+            return;
+        }
+        renderHistory(result.data);
+    }
+
+    function renderHistory(nodes) {
+        historyList.innerHTML = "";
+        if (!nodes.length) {
+            historyList.innerHTML = '<div class="empty-state compact">No changes recorded yet.</div>';
+            return;
+        }
+
+        nodes.forEach((node) => {
+            const row = document.createElement("div");
+            row.className = `history-row ${node.current ? "current" : ""}`;
+            const badges = [];
+            if (node.current) badges.push('<span class="pill">current</span>');
+            if (node.prunable) badges.push('<span class="pill subtle">amount</span>');
+            row.innerHTML = `
+                <div class="history-main">
+                    <div class="history-summary">
+                        <strong>${escapeHtml(node.summary)}</strong>
+                        ${badges.join(" ")}
+                    </div>
+                    <div class="muted">#${node.id}${node.parent_id ? ` &larr; #${node.parent_id}` : ""} &middot; ${escapeHtml(node.actor)} &middot; ${escapeHtml(formatTimestamp(node.created_at))} &middot; ${escapeHtml(node.kind)}</div>
+                </div>
+                <div class="history-actions">
+                    <button class="ghost-btn preview-btn">Preview</button>
+                    <button class="danger-btn rollback-btn">Rollback</button>
+                </div>
+            `;
+
+            row.querySelector(".preview-btn").onclick = async () => {
+                const existing = row.querySelector(".history-preview");
+                if (existing) {
+                    existing.remove();
+                    return;
+                }
+                const detail = await api(`api/lists/${list.id}/history/${node.id}`);
+                if (!detail.ok) {
+                    setGlobalStatus(detail.error || "Could not load change.", "error");
+                    return;
+                }
+                const snapshot = detail.data.snapshot;
+                const preview = document.createElement("div");
+                preview.className = "history-preview";
+                const itemLines = (snapshot.items || []).map((item) => {
+                    const claims = (item.claims || []).map((claim) => claim.claimer).join(", ");
+                    return `<div class="history-item-line">
+                        <span>${escapeHtml(item.name)}</span>
+                        <span class="muted">${item.gathered} / ${item.target}${claims ? ` &middot; claimed by ${escapeHtml(claims)}` : ""}</span>
+                    </div>`;
+                }).join("");
+                preview.innerHTML = `
+                    <div class="muted">Snapshot of "${escapeHtml(snapshot.name)}"${snapshot.deleted ? " (deleted)" : ""} &middot; ${escapeHtml(formatTimestamp(snapshot.updated_at))} &middot; ${(snapshot.items || []).length} items</div>
+                    <div class="history-items">${itemLines || '<span class="muted">No items in this snapshot.</span>'}</div>
+                `;
+                row.appendChild(preview);
+            };
+
+            row.querySelector(".rollback-btn").onclick = async () => {
+                if (!confirm(`Roll "${list.name}" back to change #${node.id}? This restores the snapshot and records a new rollback node.`)) {
+                    return;
+                }
+                const result = await api(`api/lists/${list.id}/history/${node.id}`, { method: "POST" });
+                await handleManageRefresh(result, adminMode, `Rolled back to change #${node.id}.`);
+            };
+
+            historyList.appendChild(row);
+        });
+    }
+
+    header.querySelector(".history-btn").onclick = () => {
+        const isVisible = historySection.style.display !== "none";
+        historySection.style.display = isVisible ? "none" : "block";
+        if (!isVisible) {
+            loadHistory();
+        }
+    };
+    historySection.querySelector(".refresh-history-btn").onclick = loadHistory;
+
+    wrapper.appendChild(historySection);
 
     /* ── Collaborators section (at bottom, single panel) ── */
     const collabSection = document.createElement("section");
@@ -1228,6 +1334,17 @@ function highlightMatches(text, indices) {
         .split("")
         .map((char, index) => positions.has(index) ? `<mark>${char}</mark>` : char)
         .join("");
+}
+
+function formatTimestamp(value) {
+    if (!value) {
+        return "unknown time";
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+    return date.toLocaleString();
 }
 
 function escapeHtml(text) {

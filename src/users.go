@@ -1,9 +1,10 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"os"
 )
 
 func adminUsersHandler(b *sseBroker) http.HandlerFunc {
@@ -60,7 +61,11 @@ func adminUsersHandler(b *sseBroker) http.HandlerFunc {
 				}
 				changed := revokeUserEditsFromLists(lists, req.Username)
 				if changed {
-					if err := writeLists(lists); err != nil {
+					if err := writeLists(lists, changeMeta{
+						Actor:   callerUsername,
+						Kind:    "user_edits_revoked",
+						Summary: fmt.Sprintf("Removed all edits by %q", req.Username),
+					}); err != nil {
 						http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
 						return
 					}
@@ -82,7 +87,11 @@ func adminUsersHandler(b *sseBroker) http.HandlerFunc {
 				}
 				revokeUserEditsFromLists(lists, req.Username)
 				lists, _ = deleteListsOwnedByUser(lists, req.Username)
-				if err := writeLists(lists); err != nil {
+				if err := writeLists(lists, changeMeta{
+					Actor:   callerUsername,
+					Kind:    "user_deleted",
+					Summary: fmt.Sprintf("Removed user %q and their lists", req.Username),
+				}); err != nil {
 					http.Error(w, `{"error":"Server error"}`, http.StatusInternalServerError)
 					return
 				}
@@ -110,23 +119,86 @@ func adminUsersHandler(b *sseBroker) http.HandlerFunc {
 }
 
 func readUsers() ([]user, error) {
-	var users []user
-	if _, err := os.Stat(usersPath); os.IsNotExist(err) {
-		return []user{}, nil
-	}
-	if err := readJSONFile(usersPath, &users); err != nil {
+	rows, err := db.Query(`SELECT username, password_hash, admin, frozen FROM users WHERE deleted = 0 ORDER BY username`)
+	if err != nil {
 		return nil, err
 	}
-	for i := range users {
-		if users[i].Username == "" {
-			continue
+	defer rows.Close()
+
+	users := []user{}
+	for rows.Next() {
+		var (
+			u             user
+			admin, frozen int
+		)
+		if err := rows.Scan(&u.Username, &u.PasswordHash, &admin, &frozen); err != nil {
+			return nil, err
 		}
+		u.Admin = admin != 0
+		u.Frozen = frozen != 0
+		users = append(users, u)
 	}
-	return users, nil
+	return users, rows.Err()
 }
 
 func writeUsers(users []user) error {
-	return writeJSONFile(usersPath, users)
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.Query(`SELECT username FROM users WHERE deleted = 0`)
+	if err != nil {
+		return err
+	}
+	existing := []string{}
+	for rows.Next() {
+		var username string
+		if err := rows.Scan(&username); err != nil {
+			rows.Close()
+			return err
+		}
+		existing = append(existing, username)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	keep := make(map[string]bool, len(users))
+	for _, u := range users {
+		keep[u.Username] = true
+	}
+	for _, username := range existing {
+		if keep[username] {
+			continue
+		}
+		if _, err := tx.Exec(`UPDATE users SET deleted = 1 WHERE username = ?`, username); err != nil {
+			return err
+		}
+	}
+
+	for _, u := range users {
+		if _, err := tx.Exec(
+			`INSERT INTO users(username, password_hash, admin, frozen, deleted)
+			 VALUES(?, ?, ?, ?, 0)
+			 ON CONFLICT(username) DO UPDATE SET
+			   password_hash = excluded.password_hash,
+			   admin = excluded.admin,
+			   frozen = excluded.frozen,
+			   deleted = 0`,
+			u.Username,
+			u.PasswordHash,
+			boolToInt(u.Admin),
+			boolToInt(u.Frozen),
+		); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func findUser(username string) (*user, error) {
@@ -174,15 +246,23 @@ func adminSettingsHandler(w http.ResponseWriter, r *http.Request) {
 
 func readSettings() (appSettings, error) {
 	var settings appSettings
-	if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
+	var locked int
+	err := db.QueryRow(`SELECT registration_locked_down FROM settings WHERE id = 1`).Scan(&locked)
+	if err == sql.ErrNoRows {
 		return appSettings{}, nil
 	}
-	if err := readJSONFile(settingsPath, &settings); err != nil {
+	if err != nil {
 		return appSettings{}, err
 	}
+	settings.RegistrationLockedDown = locked != 0
 	return settings, nil
 }
 
 func writeSettings(settings appSettings) error {
-	return writeJSONFile(settingsPath, settings)
+	_, err := db.Exec(
+		`INSERT INTO settings(id, registration_locked_down) VALUES(1, ?)
+		 ON CONFLICT(id) DO UPDATE SET registration_locked_down = excluded.registration_locked_down`,
+		boolToInt(settings.RegistrationLockedDown),
+	)
+	return err
 }

@@ -25,15 +25,23 @@ func listsCollectionHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		lists, err := readLists()
-		if err != nil {
-			http.Error(w, `{"error":"Could not read lists"}`, http.StatusInternalServerError)
-			return
-		}
-
 		scopeAll := r.URL.Query().Get("scope") == "all"
 		if scopeAll && !user.Admin {
 			http.Error(w, `{"error":"Forbidden"}`, http.StatusForbidden)
+			return
+		}
+
+		var (
+			lists []itemList
+			err   error
+		)
+		if scopeAll {
+			lists, err = readListsIncludingDeleted()
+		} else {
+			lists, err = readLists()
+		}
+		if err != nil {
+			http.Error(w, `{"error":"Could not read lists"}`, http.StatusInternalServerError)
 			return
 		}
 
@@ -115,7 +123,11 @@ func importListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	lists = append(lists, newList)
-	if err := writeLists(lists); err != nil {
+	if err := writeLists(lists, changeMeta{
+		Actor:   username,
+		Kind:    "list_created",
+		Summary: fmt.Sprintf("Imported list %q", listName),
+	}); err != nil {
 		http.Error(w, `{"error":"Could not create list"}`, http.StatusInternalServerError)
 		return
 	}
@@ -173,7 +185,11 @@ func joinListHandler(w http.ResponseWriter, r *http.Request) {
 
 			lists[i].Collaborators = append(lists[i].Collaborators, username)
 			touchList(&lists[i])
-			if err := writeLists(lists); err != nil {
+			if err := writeLists(lists, changeMeta{
+				Actor:   username,
+				Kind:    "member_added",
+				Summary: fmt.Sprintf("Joined list %q", lists[i].Name),
+			}); err != nil {
 				http.Error(w, `{"error":"Could not join list"}`, http.StatusInternalServerError)
 				return
 			}
@@ -219,6 +235,8 @@ func listResourceHandler(b *sseBroker) http.HandlerFunc {
 			handleListInvites(w, r, listID, user)
 		case "members":
 			handleListMembers(w, r, listID, user)
+		case "history":
+			handleListHistory(w, r, b, listID, user, parts[2:])
 		default:
 			http.NotFound(w, r)
 		}
@@ -256,6 +274,8 @@ func handleListRoot(w http.ResponseWriter, r *http.Request, listID string, user 
 			return
 		}
 
+		changeKind := "list_updated"
+		changeSummary := "Updated list"
 		switch req.Action {
 		case "", "rename":
 			req.Name = strings.TrimSpace(req.Name)
@@ -265,6 +285,8 @@ func handleListRoot(w http.ResponseWriter, r *http.Request, listID string, user 
 			}
 			lists[idx].Name = req.Name
 			touchList(&lists[idx])
+			changeKind = "list_renamed"
+			changeSummary = fmt.Sprintf("Renamed list to %q", req.Name)
 		case "transfer_owner":
 			if !user.Admin {
 				http.Error(w, `{"error":"Only admins can transfer list ownership"}`, http.StatusForbidden)
@@ -283,12 +305,18 @@ func handleListRoot(w http.ResponseWriter, r *http.Request, listID string, user 
 			lists[idx].OwnerUsername = targetUser.Username
 			lists[idx].Collaborators = removeString(lists[idx].Collaborators, targetUser.Username)
 			touchList(&lists[idx])
+			changeKind = "owner_transferred"
+			changeSummary = fmt.Sprintf("Transferred ownership to %q", targetUser.Username)
 		default:
 			http.Error(w, `{"error":"Unknown action"}`, http.StatusBadRequest)
 			return
 		}
 
-		if err := writeLists(lists); err != nil {
+		if err := writeLists(lists, changeMeta{
+			Actor:   user.Username,
+			Kind:    changeKind,
+			Summary: changeSummary,
+		}); err != nil {
 			http.Error(w, `{"error":"Could not update list"}`, http.StatusInternalServerError)
 			return
 		}
@@ -302,8 +330,13 @@ func handleListRoot(w http.ResponseWriter, r *http.Request, listID string, user 
 			http.Error(w, `{"error":"Forbidden"}`, http.StatusForbidden)
 			return
 		}
+		deletedName := lists[idx].Name
 		lists = append(lists[:idx], lists[idx+1:]...)
-		if err := writeLists(lists); err != nil {
+		if err := writeLists(lists, changeMeta{
+			Actor:   user.Username,
+			Kind:    "list_deleted",
+			Summary: fmt.Sprintf("Deleted list %q", deletedName),
+		}); err != nil {
 			http.Error(w, `{"error":"Could not delete list"}`, http.StatusInternalServerError)
 			return
 		}
@@ -350,7 +383,15 @@ func handleListItems(w http.ResponseWriter, r *http.Request, b *sseBroker, listI
 				http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
 				return
 			}
-			if err := writeLists(lists); err != nil {
+			action := "Updated"
+			if strings.TrimSpace(req.OriginalName) == "" {
+				action = "Added"
+			}
+			if err := writeLists(lists, changeMeta{
+				Actor:   user.Username,
+				Kind:    "item_saved",
+				Summary: fmt.Sprintf("%s item %q", action, strings.TrimSpace(req.Name)),
+			}); err != nil {
 				http.Error(w, `{"error":"Could not save item"}`, http.StatusInternalServerError)
 				return
 			}
@@ -372,7 +413,11 @@ func handleListItems(w http.ResponseWriter, r *http.Request, b *sseBroker, listI
 				http.Error(w, `{"error":"Item not found"}`, http.StatusNotFound)
 				return
 			}
-			if err := writeLists(lists); err != nil {
+			if err := writeLists(lists, changeMeta{
+				Actor:   user.Username,
+				Kind:    "item_deleted",
+				Summary: fmt.Sprintf("Deleted item %q", strings.TrimSpace(req.Name)),
+			}); err != nil {
 				http.Error(w, `{"error":"Could not delete item"}`, http.StatusInternalServerError)
 				return
 			}
@@ -405,7 +450,11 @@ func handleListItems(w http.ResponseWriter, r *http.Request, b *sseBroker, listI
 			http.Error(w, `{"error":"Item not found"}`, http.StatusNotFound)
 			return
 		}
-		if err := writeLists(lists); err != nil {
+		if err := writeLists(lists, changeMeta{
+			Actor:   user.Username,
+			Kind:    "gathered_updated",
+			Summary: fmt.Sprintf("Updated gathered amount for %q", req.Name),
+		}); err != nil {
 			http.Error(w, `{"error":"Could not save item"}`, http.StatusInternalServerError)
 			return
 		}
@@ -426,7 +475,11 @@ func handleListItems(w http.ResponseWriter, r *http.Request, b *sseBroker, listI
 			http.Error(w, `{"error":"Item not found"}`, http.StatusNotFound)
 			return
 		}
-		if err := writeLists(lists); err != nil {
+		if err := writeLists(lists, changeMeta{
+			Actor:   user.Username,
+			Kind:    "claim_updated",
+			Summary: fmt.Sprintf("Updated claim on %q", req.Name),
+		}); err != nil {
 			http.Error(w, `{"error":"Could not save item"}`, http.StatusInternalServerError)
 			return
 		}
@@ -466,7 +519,11 @@ func handleListInvites(w http.ResponseWriter, r *http.Request, listID string, us
 			CreatedBy: user.Username,
 		})
 		touchList(&lists[idx])
-		if err := writeLists(lists); err != nil {
+		if err := writeLists(lists, changeMeta{
+			Actor:   user.Username,
+			Kind:    "invite_created",
+			Summary: "Generated an invite code",
+		}); err != nil {
 			http.Error(w, `{"error":"Could not save invite code"}`, http.StatusInternalServerError)
 			return
 		}
@@ -494,7 +551,11 @@ func handleListInvites(w http.ResponseWriter, r *http.Request, listID string, us
 			return
 		}
 		touchList(&lists[idx])
-		if err := writeLists(lists); err != nil {
+		if err := writeLists(lists, changeMeta{
+			Actor:   user.Username,
+			Kind:    "invite_revoked",
+			Summary: "Revoked an invite code",
+		}); err != nil {
 			http.Error(w, `{"error":"Could not revoke invite code"}`, http.StatusInternalServerError)
 			return
 		}
@@ -538,7 +599,11 @@ func handleListMembers(w http.ResponseWriter, r *http.Request, listID string, us
 		return
 	}
 	touchList(&lists[idx])
-	if err := writeLists(lists); err != nil {
+	if err := writeLists(lists, changeMeta{
+		Actor:   user.Username,
+		Kind:    "member_removed",
+		Summary: fmt.Sprintf("Removed member %q", req.Username),
+	}); err != nil {
 		http.Error(w, `{"error":"Could not remove member"}`, http.StatusInternalServerError)
 		return
 	}
@@ -555,6 +620,7 @@ func makeListSummary(list itemList, username string, isAdmin bool) listSummary {
 		ItemCount:     len(list.Items),
 		Collaborators: cloneStrings(list.Collaborators),
 		UpdatedAt:     list.UpdatedAt,
+		Deleted:       list.Deleted,
 	}
 }
 
@@ -577,6 +643,8 @@ func listRole(list itemList, username string, isAdmin bool) string {
 	switch {
 	case isAdmin:
 		return "admin"
+	case list.Deleted:
+		return "deleted"
 	case list.OwnerUsername == username:
 		return "owner"
 	case slices.Contains(list.Collaborators, username):
@@ -587,54 +655,17 @@ func listRole(list itemList, username string, isAdmin bool) string {
 }
 
 func canAccessList(list itemList, username string, isAdmin bool) bool {
+	if list.Deleted {
+		return isAdmin
+	}
 	return isAdmin || list.OwnerUsername == username || slices.Contains(list.Collaborators, username)
 }
 
 func canManageList(list itemList, username string, isAdmin bool) bool {
+	if list.Deleted {
+		return isAdmin
+	}
 	return isAdmin || list.OwnerUsername == username
-}
-
-func readLists() ([]itemList, error) {
-	var lists []itemList
-	if _, err := os.Stat(listsPath); os.IsNotExist(err) {
-		return []itemList{}, nil
-	}
-	if err := readJSONFile(listsPath, &lists); err != nil {
-		return nil, err
-	}
-
-	changed := false
-	for i := range lists {
-		if normalizeList(&lists[i]) {
-			changed = true
-		}
-	}
-	if changed {
-		if err := writeJSONFile(listsPath, lists); err != nil {
-			return nil, err
-		}
-	}
-	return lists, nil
-}
-
-func writeLists(lists []itemList) error {
-	for i := range lists {
-		normalizeList(&lists[i])
-	}
-	return writeJSONFile(listsPath, lists)
-}
-
-func readListsWithIndex(listID string) ([]itemList, int, error) {
-	lists, err := readLists()
-	if err != nil {
-		return nil, -1, err
-	}
-	for i := range lists {
-		if lists[i].ID == listID {
-			return lists, i, nil
-		}
-	}
-	return lists, -1, nil
 }
 
 func readLegacyItems() ([]item, error) {
@@ -726,6 +757,9 @@ func normalizeItem(it *item) bool {
 	if len(normalized) != len(it.Contributions) {
 		changed = true
 	}
+	if normalized == nil {
+		normalized = []contribution{}
+	}
 	it.Contributions = normalized
 
 	if it.Gathered != total {
@@ -760,6 +794,9 @@ func normalizeItem(it *item) bool {
 	}
 	if len(claims) != len(it.Claims) {
 		changed = true
+	}
+	if claims == nil {
+		claims = []claim{}
 	}
 	it.Claims = claims
 

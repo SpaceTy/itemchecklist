@@ -70,6 +70,8 @@ type itemList struct {
 	Items         []item       `json:"items"`
 	CreatedAt     string       `json:"created_at"`
 	UpdatedAt     string       `json:"updated_at"`
+	Deleted       bool         `json:"deleted,omitempty"`
+	HeadChangeID  int64        `json:"-"`
 }
 
 type listSummary struct {
@@ -81,6 +83,7 @@ type listSummary struct {
 	ItemCount     int      `json:"item_count"`
 	Collaborators []string `json:"collaborators"`
 	UpdatedAt     string   `json:"updated_at"`
+	Deleted       bool     `json:"deleted"`
 }
 
 type listDetail struct {
